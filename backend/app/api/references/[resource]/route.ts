@@ -6,10 +6,6 @@ import { response, failure, preflight } from "../../../../lib/http";
 export const OPTIONS = preflight;
 const tables = new Set([
   "categories",
-  "warehouses",
-  "units",
-  "partners",
-  "locations",
 ]);
 const schema = z.object({
   id: z.number().int().positive().optional(),

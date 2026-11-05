@@ -1,3 +1,4 @@
+import { companyMovement } from '../../../../lib/company';
 import type { RowDataPacket } from "../../../../lib/db";
 import { db } from "../../../../lib/db";
 import { authorize } from "../../../../lib/security";
@@ -26,7 +27,7 @@ export async function PUT(
   try {
     const user = await authorize(request, true);
     const { id } = await params;
-    const p = movementSchema.safeParse(await request.json());
+    const p = movementSchema.safeParse(await companyMovement(await request.json()));
     if (!/^\d+$/.test(id) || !p.success)
       return response(request, { error: "Mouvement invalide." }, 400);
     connection = await db().getConnection();

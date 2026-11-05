@@ -10,7 +10,7 @@ const schema = z.object({
   email: z.email().max(190),
   role: z.enum(["admin", "manager"]),
   active: z.boolean(),
-  password: z.string().min(12).max(256).optional(),
+  password: z.string().min(8).max(256).optional(),
 });
 export async function GET(request: Request) {
   try {

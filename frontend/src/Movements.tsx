@@ -18,7 +18,15 @@ import {
   type MovementDraft,
   type Settings,
 } from "./client";
-import { Confirm, Dialog, Empty, Message, Status } from "./ui";
+import {
+  Confirm,
+  Dialog,
+  Empty,
+  Message,
+  Status,
+  Skeleton,
+  Spinner,
+} from "./ui";
 type Result = { items: Movement[]; total: number; page: number; size: number };
 export function Movements({
   api,
@@ -42,7 +50,6 @@ export function Movements({
   const [filters, setFilters] = useState({
       kind: "",
       status: "",
-      warehouse_id: "",
       from: "",
       to: "",
       q: "",
@@ -64,7 +71,6 @@ export function Movements({
       run: () => Promise<void>;
     } | null>(null),
     [reversal, setReversal] = useState<Movement | null>(null),
-    [reason, setReason] = useState(""),
     [reverseError, setReverseError] = useState("");
   const load = useCallback(async () => {
     setBusy(true);
@@ -172,7 +178,6 @@ export function Movements({
             disabled={!online}
             onClick={() => {
               setReversal(d);
-              setReason("");
               setReverseError("");
             }}
           >
@@ -196,26 +201,12 @@ export function Movements({
               className="outline"
               onClick={() =>
                 csv("mouvements-page-" + page, [
-                  [
-                    "Référence",
-                    "Type",
-                    "Statut",
-                    "Date UTC",
-                    "Dépôt",
-                    "Destination",
-                    "Motif",
-                    "Bon",
-                    "Auteur",
-                  ],
+                  ["Référence", "Type", "Statut", "Date UTC", "Auteur"],
                   ...result.items.map((d) => [
                     d.reference || "Brouillon #" + d.id,
                     kindLabel[d.kind],
                     d.status,
                     d.created_at,
-                    d.warehouse,
-                    d.destination,
-                    d.reason,
-                    d.external_reference,
                     d.author,
                   ]),
                 ])
@@ -244,7 +235,7 @@ export function Movements({
             <Search size={16} />
             <input
               aria-label="Rechercher les mouvements"
-              placeholder="Article, référence, bon, motif…"
+              placeholder="Article, référence…"
               value={filters.q}
               onChange={(e) => setFilters({ ...filters, q: e.target.value })}
             />
@@ -271,20 +262,7 @@ export function Movements({
             <option value="validated">Validé</option>
             <option value="cancelled">Annulé</option>
           </select>
-          <select
-            aria-label="Dépôt"
-            value={filters.warehouse_id}
-            onChange={(e) =>
-              setFilters({ ...filters, warehouse_id: e.target.value })
-            }
-          >
-            <option value="">Tous les dépôts</option>
-            {catalog.warehouses.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name}
-              </option>
-            ))}
-          </select>
+
           <label>
             Du (UTC)
             <input
@@ -310,7 +288,6 @@ export function Movements({
               const empty = {
                 kind: "",
                 status: "",
-                warehouse_id: "",
                 from: "",
                 to: "",
                 q: "",
@@ -324,19 +301,13 @@ export function Movements({
           </button>
         </form>
         <Message text={error} />
-        {busy && (
-          <p className="loading" role="status">
-            Chargement des opérations…
-          </p>
-        )}
-        <div className="table-scroll">
+        {busy && <Skeleton />}
+        <div className="table-scroll" hidden={busy}>
           <table>
             <thead>
               <tr>
                 <th>DOCUMENT / DATE</th>
                 <th>TYPE</th>
-                <th>DÉPÔT</th>
-                <th>MOTIF / BON</th>
                 <th>AUTEUR</th>
                 <th>STATUT</th>
                 <th>ACTIONS</th>
@@ -365,18 +336,6 @@ export function Movements({
                       {kindLabel[d.kind]}
                     </span>
                     <small className="block">{d.line_count} article(s)</small>
-                  </td>
-                  <td>
-                    {d.warehouse}
-                    {d.destination && (
-                      <small className="block">→ {d.destination}</small>
-                    )}
-                  </td>
-                  <td>
-                    {d.reason}
-                    <small className="block">
-                      {d.external_reference || "—"}
-                    </small>
                   </td>
                   <td>{d.author}</td>
                   <td>
@@ -431,23 +390,8 @@ export function Movements({
           </div>
           <div className="detail-grid">
             <p>
-              <small>Dépôt</small>
-              <b>
-                {detail.warehouse}
-                {detail.destination ? " → " + detail.destination : ""}
-              </b>
-            </p>
-            <p>
               <small>Auteur</small>
               <b>{detail.author}</b>
-            </p>
-            <p>
-              <small>Motif</small>
-              <b>{detail.reason}</b>
-            </p>
-            <p>
-              <small>Référence du bon</small>
-              <b>{detail.external_reference || "—"}</b>
             </p>
           </div>
           <div className="table-scroll">
@@ -466,9 +410,7 @@ export function Movements({
                       <b>{l.name}</b>
                       <small className="block">{l.sku}</small>
                     </td>
-                    <td>
-                      {number(l.quantity)} {l.unit}
-                    </td>
+                    <td>{number(l.quantity)}</td>
                     <td>
                       {l.unit_cost === null
                         ? "—"
@@ -513,7 +455,7 @@ export function Movements({
                 await api(
                   "/api/documents/" + reversal.id + "/reverse",
                   "POST",
-                  { reason },
+                  { reason: "Correction du mouvement" },
                   "reverse-document-" + reversal.id,
                 );
                 await refresh();
@@ -525,15 +467,6 @@ export function Movements({
               }
             }}
           >
-            <label>
-              Motif de correction
-              <input
-                required
-                maxLength={255}
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-              />
-            </label>
             <Message text={reverseError} />
             <div className="form-actions">
               <button

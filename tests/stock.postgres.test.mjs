@@ -34,9 +34,10 @@ test(
       unit = await insert("INSERT INTO units(name) VALUES (?)", [
         "test-" + suffix,
       ]);
-      source = await insert(
-        "INSERT INTO warehouses(name) VALUES ('Test source')",
+      const [company] = await pool.execute(
+        "SELECT stock_warehouse_id id FROM app_settings WHERE id=1",
       );
+      source = company[0].id;
       destination = await insert(
         "INSERT INTO warehouses(name) VALUES ('Test destination')",
       );
@@ -160,7 +161,6 @@ test(
         await pool.execute("DELETE FROM products WHERE id=?", [product]);
       }
       for (const [table, id] of [
-        ["warehouses", source],
         ["warehouses", destination],
         ["units", unit],
         ["categories", category],

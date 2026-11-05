@@ -16,12 +16,10 @@ export async function PUT(
       return response(request, { error: "Produit invalide." }, 400);
     const v = p.data;
     const [r] = await db().execute<ResultSetHeader>(
-      "UPDATE products SET sku=?,name=?,category_id=?,unit_id=?,minimum=?,cost=?,barcode=?,active=? WHERE id=?",
+      "UPDATE products SET name=?,category_id=?,minimum=?,cost=?,barcode=?,active=? WHERE id=?",
       [
-        v.sku,
         v.name,
         v.category_id,
-        v.unit_id,
         v.minimum,
         v.cost,
         v.barcode || null,

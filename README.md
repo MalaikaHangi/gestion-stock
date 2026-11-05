@@ -8,7 +8,9 @@ Application en français, hébergée en ligne : interface React sur Vercel, API 
 | --- | --- | --- |
 | Consulter les articles et le stock | Oui | Oui |
 | Créer, modifier et annuler des brouillons | Oui | Oui |
-| Valider les entrées, sorties et transferts | Oui | Oui |
+| Valider les entrées et sorties | Oui | Oui |
+| Consulter les inventaires physiques | Oui | Oui |
+| Enregistrer un comptage et corriger un écart | Oui | Non |
 | Consulter l’historique et exporter les états | Oui | Oui |
 | Contrepasser un mouvement validé | Oui | Non |
 | Gérer les articles et référentiels | Oui | Non |
@@ -18,11 +20,11 @@ Les autorisations sont contrôlées par l’API. Les comptes utilisent des mots 
 
 ## Opérations de stock
 
-L’administrateur crée les catégories, unités, dépôts et articles. Le responsable enregistre ensuite un brouillon d’entrée ou de sortie avec motif, bon, dépôt et plusieurs articles. La validation met à jour toutes les lignes dans une même transaction PostgreSQL ; le moindre échec annule tout. Les sorties qui dépassent le stock disponible sont refusées.
+L’administrateur crée les catégories et articles ; les SKU sont automatiques. Le responsable enregistre un brouillon d’entrée ou sortie avec les articles et quantités, dans le stock unique de l’entreprise. La validation met à jour toutes les lignes dans une transaction PostgreSQL ; le moindre échec annule tout. Les sorties qui dépassent le stock disponible sont refusées. L’inventaire physique permet à l’administrateur de vérifier le stock réel et corriger les écarts avec un historique.
 
 Les brouillons peuvent être corrigés ou annulés sans effet sur le stock. Un document validé reste immuable dans l’API. Sa correction administrative crée une contrepassation liée à l’original, avec conservation de l’historique. Une contrepassation ne peut pas rendre le stock négatif.
 
-Le journal est paginé et filtrable par type, dépôt, statut, période, article, SKU, motif ou bon. L’état de stock calcule ouverture, entrées, sorties et clôture sur des journées UTC. Les heures affichées suivent le fuseau de l’organisation. Les exports sont au format CSV ; celui du journal correspond explicitement à la page affichée.
+Le journal est paginé et filtrable par type, statut, période, article et SKU. Les rapports journaliers, mensuels et annuels calculent ouverture, entrées, sorties et clôture sur des journées UTC et s’exportent en PDF et Excel. Le journal conserve un export CSV de la page affichée. Voir [le fonctionnement du stock unique](docs/company-stock.md).
 
 ## Hébergement gratuit
 

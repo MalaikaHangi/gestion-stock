@@ -23,6 +23,8 @@ import {
   ListChecks,
   Pencil,
   Trash2,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import {
   API_URL,
@@ -39,9 +41,11 @@ import { MovementForm } from "./MovementForm";
 import { Movements } from "./Movements";
 import { Reports } from "./Reports";
 import { Admin, ProductForm } from "./Admin";
-import { Confirm, Empty, Message } from "./ui";
+import { Inventory } from "./Inventory";
+import { Confirm, Empty, Message, Skeleton, Spinner } from "./ui";
 import "./style.css";
 import "./operations.css";
+import "./responsive.css";
 const emptyCatalog: Catalog = {
   products: [],
   warehouses: [],
@@ -74,7 +78,7 @@ function App() {
     [deleting, setDeleting] = useState<Product | null>(null),
     [query, setQuery] = useState(""),
     [category, setCategory] = useState(""),
-    [warehouse, setWarehouse] = useState("");
+    [logoutPrompt, setLogoutPrompt] = useState(false);
   const api = useMemo(() => client(session), [session]);
   const admin = session?.user.role === "admin";
   const refresh = useCallback(async () => {
@@ -123,6 +127,7 @@ function App() {
       await api("/api/auth", "DELETE");
     } finally {
       signedOut();
+      setLogoutPrompt(false);
     }
   };
   const open = (initial?: MovementDraft, kind: MovementDraft["kind"] = "IN") =>
@@ -140,23 +145,17 @@ function App() {
   const baseNav = [
     { label: "Entrées & sorties", Icon: ArrowLeftRight },
     { label: "Tableau de bord", Icon: LayoutDashboard },
-    { label: "Inventaire & articles", Icon: Boxes },
-    { label: "État du stock", Icon: Download },
+    { label: "Gestion des articles", Icon: Boxes },
+    { label: "Inventaire physique", Icon: ListChecks },
+    { label: "Rapports", Icon: Download },
   ];
   const adminNav = [
-    { label: "Référentiels", Icon: Warehouse },
+    { label: "Catégories", Icon: Boxes },
     { label: "Utilisateurs", Icon: Users },
     { label: "Journal d’audit", Icon: ListChecks },
     { label: "Paramètres", Icon: SettingsIcon },
   ];
-  const products = catalog.products.map((p) => ({
-    ...p,
-    quantity: warehouse
-      ? catalog.balances.find(
-          (b) => b.product_id === p.id && String(b.warehouse_id) === warehouse,
-        )?.quantity || "0"
-      : p.quantity,
-  }));
+  const products = catalog.products;
   const filtered = products.filter(
     (p) =>
       (p.name + " " + p.sku).toLowerCase().includes(query.toLowerCase()) &&
@@ -167,13 +166,12 @@ function App() {
   );
   const exportStock = () =>
     csv("stock", [
-      ["SKU", "Article", "Catégorie", "Quantité", "Unité", "Statut"],
+      ["SKU", "Article", "Catégorie", "Quantité", "Statut"],
       ...filtered.map((p) => [
         p.sku,
         p.name,
         p.category,
         p.quantity,
-        p.unit,
         p.active ? "Actif" : "Désactivé",
       ]),
     ]);
@@ -206,7 +204,7 @@ function App() {
             className="avatar"
             aria-label="Se déconnecter"
             title="Se déconnecter"
-            onClick={() => void logout()}
+            onClick={() => setLogoutPrompt(true)}
           >
             <LogOut size={18} />
           </button>
@@ -261,12 +259,19 @@ function App() {
             {notice} · Fermer
           </button>
         )}
-        {loading && (
-          <p role="status" className="loading">
-            Actualisation du stock…
-          </p>
-        )}
-        {page === "Entrées & sorties" ? (
+        {loading ? (
+          <Skeleton />
+        ) : page === "Inventaire physique" ? (
+          <Inventory
+            api={api}
+            catalog={catalog}
+            admin={!!admin}
+            online={online}
+            changed={refresh}
+            version={version}
+            settings={settings}
+          />
+        ) : page === "Entrées & sorties" ? (
           <>
             <div className="page-intro">
               <div>
@@ -309,7 +314,7 @@ function App() {
               changed={refresh}
             />
           </>
-        ) : page === "État du stock" ? (
+        ) : page === "Rapports" ? (
           <Reports
             api={api}
             catalog={catalog}
@@ -318,7 +323,7 @@ function App() {
           />
         ) : admin && adminNav.some((n) => n.label === page) ? (
           <Admin
-            page={page}
+            page={page === "Catégories" ? "Référentiels" : page}
             api={api}
             catalog={catalog}
             settings={settings}
@@ -345,7 +350,7 @@ function App() {
                       validés.
                     </p>
                     <div className="hero-meta">
-                      <Warehouse size={15} /> Tous les dépôts <span>•</span>
+                      <Boxes size={15} /> Stock de l’entreprise <span>•</span>
                       {catalog.syncedAt
                         ? "Actualisé à " +
                           new Date(catalog.syncedAt).toLocaleTimeString(
@@ -374,11 +379,11 @@ function App() {
                       color: "blue",
                     },
                     {
-                      label: "Dépôts actifs",
+                      label: "Catégories",
                       value: number(
-                        catalog.warehouses.filter((w) => w.active).length,
+                        catalog.categories.filter((c) => c.active).length,
                       ),
-                      Icon: Warehouse,
+                      Icon: Boxes,
                       color: "navy",
                     },
                     {
@@ -467,18 +472,6 @@ function App() {
                       ),
                     )}
                   </select>
-                  <select
-                    aria-label="Dépôt"
-                    value={warehouse}
-                    onChange={(e) => setWarehouse(e.target.value)}
-                  >
-                    <option value="">Tous les dépôts</option>
-                    {catalog.warehouses.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name}
-                      </option>
-                    ))}
-                  </select>
                 </div>
                 <div className="table-scroll">
                   <table>
@@ -507,7 +500,7 @@ function App() {
                           </td>
                           <td>{p.category}</td>
                           <td>
-                            <b>{number(p.quantity)}</b> <small>{p.unit}</small>
+                            <b>{number(p.quantity)}</b>
                           </td>
                           <td>
                             <span
@@ -604,8 +597,8 @@ function App() {
                     toujours accessible.
                   </h3>
                   <p>
-                    Retrouvez le bon, les articles et l’auteur de chaque entrée
-                    ou sortie.
+                    Retrouvez les articles et l’auteur de chaque entrée ou
+                    sortie.
                   </p>
                   <button
                     className="outline"
@@ -623,6 +616,14 @@ function App() {
           <span>Affichage : {settings.timezone}</span>
         </footer>
       </main>
+      {logoutPrompt && (
+        <Confirm
+          title="Se déconnecter ?"
+          description="Voulez-vous vraiment quitter votre session ?"
+          confirm={logout}
+          close={() => setLogoutPrompt(false)}
+        />
+      )}
       {movement && (
         <MovementForm
           catalog={catalog}
@@ -676,6 +677,7 @@ function Login({
 }) {
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const api = useMemo(() => client(null), []);
   return (
     <div className="login-screen">
@@ -740,12 +742,26 @@ function Login({
           </label>
           <label>
             Mot de passe
-            <input
-              required
-              type="password"
-              name="password"
-              autoComplete="current-password"
-            />
+            <div className="password-field">
+              <input
+                required
+                type={showPassword ? "text" : "password"}
+                name="password"
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                aria-label={
+                  showPassword
+                    ? "Masquer le mot de passe"
+                    : "Afficher le mot de passe"
+                }
+                aria-pressed={showPassword}
+                onClick={() => setShowPassword(!showPassword)}
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
           </label>
           <Message text={error} />
           {!online && (
@@ -761,7 +777,13 @@ function Login({
             className="primary full"
             disabled={busy || !online || !API_URL}
           >
-            {busy ? "Connexion…" : "Se connecter"}
+            {busy ? (
+              <>
+                <Spinner /> Connexion…
+              </>
+            ) : (
+              "Se connecter"
+            )}
           </button>
         </form>
         <p className="login-footer">

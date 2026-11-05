@@ -75,7 +75,7 @@ export type Movement = {
 };
 export type MovementDraft = {
   id?: number;
-  kind: "IN" | "OUT" | "TRANSFER";
+  kind: "IN" | "OUT";
   warehouse_id: number;
   destination_id: number | null;
   partner_id: number | null;
@@ -123,7 +123,7 @@ export const number = (value: number | string) =>
 export const kindLabel: Record<string, string> = {
   IN: "Entrée",
   OUT: "Sortie",
-  TRANSFER: "Transfert",
+  TRANSFER: "Ancienne opération",
   REVERSAL: "Contrepassation",
 };
 export function date(value: string | null, timezone: string) {

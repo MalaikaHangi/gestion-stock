@@ -1,3 +1,4 @@
+import { companyDefaults } from '../../../lib/company';
 import type { RowDataPacket, ResultSetHeader } from "../../../lib/db";
 import { productSchema } from "../../../lib/validation";
 import { db } from "../../../lib/db";
@@ -48,13 +49,15 @@ export async function POST(request: Request) {
         400,
       );
     const p = parsed.data;
+    const defaults=await companyDefaults();
+    const [codes]=await db().query<RowDataPacket[]>("SELECT 'ART-'||lpad(nextval('product_sku_seq')::text,8,'0') sku");
     const [r] = await db().execute<ResultSetHeader>(
       "INSERT INTO products(sku,name,category_id,unit_id,minimum,cost,barcode,active) VALUES(?,?,?,?,?,?,?,?)",
       [
-        p.sku,
+        codes[0].sku,
         p.name,
         p.category_id,
-        p.unit_id,
+        defaults.unit,
         p.minimum,
         p.cost,
         p.barcode || null,

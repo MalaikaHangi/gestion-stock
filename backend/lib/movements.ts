@@ -5,10 +5,7 @@ export async function checkReferences(
   connection: PoolConnection,
   p: ReturnType<typeof movementSchema.parse>,
 ) {
-  const warehouseIds = [
-    p.warehouse_id,
-    ...(p.kind === "TRANSFER" ? [p.destination_id!] : []),
-  ];
+  const warehouseIds = [p.warehouse_id];
   const [warehouses] = await connection.execute<RowDataPacket[]>(
     `SELECT id FROM warehouses WHERE active=1 AND id IN (${warehouseIds.map(() => "?").join(",")}) FOR SHARE`,
     warehouseIds,

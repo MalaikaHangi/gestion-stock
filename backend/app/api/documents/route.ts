@@ -1,3 +1,4 @@
+import { companyMovement } from '../../../lib/company';
 import type { ResultSetHeader, RowDataPacket } from "../../../lib/db";
 import { db } from "../../../lib/db";
 import { authorize, digest } from "../../../lib/security";
@@ -70,13 +71,13 @@ export async function POST(request: Request) {
   let connection;
   try {
     const user = await authorize(request, true);
-    const parsed = movementSchema.safeParse(await request.json());
+    const parsed = movementSchema.safeParse(await companyMovement(await request.json()));
     if (!parsed.success)
       return response(
         request,
         {
           error:
-            "Vérifiez le motif, les dépôts et les quantités positives. Un article ne doit figurer qu’une fois.",
+            "Vérifiez les quantités positives. Un article ne doit figurer qu’une fois.",
         },
         400,
       );
@@ -109,7 +110,7 @@ export async function POST(request: Request) {
       return response(
         request,
         {
-          error: "Un article, partenaire ou dépôt est inactif ou introuvable.",
+          error: "Un article est inactif ou introuvable.",
         },
         409,
       );

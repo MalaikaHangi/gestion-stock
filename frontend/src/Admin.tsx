@@ -9,14 +9,10 @@ import {
   type Settings,
   type User,
 } from "./client";
-import { Confirm, Dialog, Empty, Message } from "./ui";
+import { Confirm, Dialog, Empty, Message, Skeleton } from "./ui";
 type Values = Record<string, string | number | boolean | null | undefined>;
 const referenceNames: Record<string, string> = {
   categories: "Catégories",
-  warehouses: "Dépôts",
-  units: "Unités",
-  partners: "Partenaires",
-  locations: "Emplacements",
 };
 export function Admin({
   page,
@@ -36,6 +32,7 @@ export function Admin({
   signedOut: () => void;
 }) {
   const [resource, setResource] = useState("categories"),
+    [loading, setLoading] = useState(true),
     [rows, setRows] = useState<Values[]>([]),
     [editing, setEditing] = useState<Values | null>(null),
     [error, setError] = useState(""),
@@ -51,12 +48,15 @@ export function Admin({
           ? "/api/audit?page=" + auditPage
           : "/api/settings";
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       setError("");
       if (page === "Paramètres") return;
       setRows(await api<Values[]>(base));
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setLoading(false);
     }
   }, [api, base, page]);
   useEffect(() => {
@@ -113,7 +113,7 @@ export function Admin({
       <section className="panel">
         <div className="panel-title">
           <div>
-            <h2>{page}</h2>
+            <h2>{page === "Référentiels" ? "Catégories" : page}</h2>
             <p>
               {isUser
                 ? "Deux rôles : administrateur et responsable. Les comptes désactivés restent dans l’historique."
@@ -148,7 +148,8 @@ export function Admin({
           </div>
         )}
         <Message text={!editing ? error : ""} />
-        <div className="table-scroll">
+        {loading && <Skeleton />}
+        <div className="table-scroll" hidden={loading}>
           <table>
             <thead>
               <tr>
@@ -328,13 +329,13 @@ export function Admin({
                   <input
                     type="password"
                     name="password"
-                    minLength={12}
+                    minLength={8}
                     maxLength={256}
                     required={!editing.id}
                     autoComplete="new-password"
                   />
                   <small>
-                    12 caractères minimum. Toute modification révoque les
+                    8 caractères minimum. Toute modification révoque les
                     sessions du compte.
                   </small>
                 </label>
@@ -538,10 +539,8 @@ export function ProductForm({
           setBusy(true);
           const f = new FormData(e.currentTarget);
           const values = {
-            sku: String(f.get("sku")),
             name: String(f.get("name")),
             category_id: Number(f.get("category_id")),
-            unit_id: Number(f.get("unit_id")),
             minimum: String(f.get("minimum")),
             cost: String(f.get("cost")),
             barcode: String(f.get("barcode") || "") || null,
@@ -562,15 +561,10 @@ export function ProductForm({
           }
         }}
       >
-        <label>
-          Référence SKU
-          <input
-            required
-            name="sku"
-            maxLength={60}
-            defaultValue={product?.sku}
-          />
-        </label>
+        <p className="muted">
+          Référence SKU :{" "}
+          {product?.sku || "attribuée automatiquement à l’enregistrement"}
+        </p>
         <label>
           Nom
           <input
@@ -596,21 +590,6 @@ export function ProductForm({
                     {c.name}
                   </option>
                 ))}
-            </select>
-          </label>
-          <label>
-            Unité
-            <select
-              required
-              name="unit_id"
-              defaultValue={product?.unit_id || ""}
-            >
-              <option value="">Choisir</option>
-              {catalog.units.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                </option>
-              ))}
             </select>
           </label>
         </div>

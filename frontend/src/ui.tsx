@@ -1,5 +1,31 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { X } from "lucide-react";
+import { X, LoaderCircle } from "lucide-react";
+export function Spinner() {
+  return <LoaderCircle className="spinner" size={18} aria-hidden="true" />;
+}
+export function Skeleton() {
+  return (
+    <div
+      className="skeleton-layout"
+      role="status"
+      aria-label="Chargement des données"
+      aria-live="polite"
+    >
+      <span className="sr-only">Chargement des données…</span>
+      <div className="skeleton skeleton-heading" />
+      <div className="skeleton-cards">
+        {[0, 1, 2, 3].map((i) => (
+          <div className="skeleton skeleton-card" key={i} />
+        ))}
+      </div>
+      <div className="skeleton-table">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <div className="skeleton skeleton-row" key={i} />
+        ))}
+      </div>
+    </div>
+  );
+}
 export function Dialog({
   title,
   children,
@@ -12,11 +38,15 @@ export function Dialog({
   wide?: boolean;
 }) {
   const container = useRef<HTMLElement>(null);
+  const closeRef = useRef(close);
+  closeRef.current = close;
   useEffect(() => {
     const previous = document.activeElement as HTMLElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     container.current?.focus();
     const handle = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
+      if (event.key === "Escape") closeRef.current();
       if (event.key === "Tab") {
         const elements = container.current?.querySelectorAll<HTMLElement>(
           'button:not(:disabled),input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex="0"]',
@@ -36,9 +66,10 @@ export function Dialog({
     document.addEventListener("keydown", handle);
     return () => {
       document.removeEventListener("keydown", handle);
+      document.body.style.overflow = previousOverflow;
       previous?.focus();
     };
-  }, [close]);
+  }, []);
   return (
     <div className="overlay">
       <section
@@ -73,7 +104,12 @@ export function Confirm({
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   return (
-    <Dialog title={title} close={close}>
+    <Dialog
+      title={title}
+      close={() => {
+        if (!busy) close();
+      }}
+    >
       <p>{description}</p>
       {error && (
         <p role="alert" className="form-error">
@@ -81,7 +117,7 @@ export function Confirm({
         </p>
       )}
       <div className="form-actions">
-        <button className="outline" onClick={close}>
+        <button className="outline" disabled={busy} onClick={close}>
           Revenir
         </button>
         <button
@@ -99,7 +135,13 @@ export function Confirm({
             }
           }}
         >
-          {busy ? "Traitement…" : "Confirmer"}
+          {busy ? (
+            <>
+              <Spinner /> Traitement…
+            </>
+          ) : (
+            "Confirmer"
+          )}
         </button>
       </div>
     </Dialog>

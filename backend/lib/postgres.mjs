@@ -11,6 +11,7 @@ const idTables = new Set([
   "document_lines",
   "ledger",
   "audit",
+  "stock_counts",
 ]);
 export function postgresConfig(env = process.env, migration = false) {
   const connectionString = migration

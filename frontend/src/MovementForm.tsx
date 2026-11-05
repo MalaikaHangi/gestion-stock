@@ -1,11 +1,5 @@
 import { useState } from "react";
-import {
-  ArrowDownLeft,
-  ArrowUpRight,
-  ArrowLeftRight,
-  Plus,
-  Trash2,
-} from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Plus, Trash2 } from "lucide-react";
 import type { Api, Catalog, MovementDraft } from "./client";
 import { number } from "./client";
 import { Dialog, Message } from "./ui";
@@ -33,7 +27,7 @@ export function MovementForm({
       destination_id: null,
       partner_id: null,
       external_reference: "",
-      reason: "",
+      reason: kind === "OUT" ? "Sortie de stock" : "Entrée de stock",
       lines: [
         {
           product_id: catalog.products.find((p) => p.active)?.id || 0,
@@ -87,7 +81,6 @@ export function MovementForm({
             [
               { value: "IN", label: "Entrée", Icon: ArrowDownLeft },
               { value: "OUT", label: "Sortie", Icon: ArrowUpRight },
-              { value: "TRANSFER", label: "Transfert", Icon: ArrowLeftRight },
             ] as const
           ).map(({ value, label, Icon }) => (
             <button
@@ -100,92 +93,6 @@ export function MovementForm({
               {label}
             </button>
           ))}
-        </div>
-        <div className="form-grid">
-          <label>
-            Dépôt {draft.kind === "TRANSFER" ? "source" : ""}
-            <select
-              required
-              value={draft.warehouse_id}
-              onChange={(e) => patch({ warehouse_id: Number(e.target.value) })}
-            >
-              <option value="">Choisir un dépôt</option>
-              {catalog.warehouses
-                .filter((w) => w.active)
-                .map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name}
-                  </option>
-                ))}
-            </select>
-          </label>
-          {draft.kind === "TRANSFER" ? (
-            <label>
-              Dépôt destination
-              <select
-                required
-                value={draft.destination_id || ""}
-                onChange={(e) =>
-                  patch({ destination_id: Number(e.target.value) })
-                }
-              >
-                <option value="">Choisir un dépôt</option>
-                {catalog.warehouses
-                  .filter((w) => w.active && w.id !== draft.warehouse_id)
-                  .map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name}
-                    </option>
-                  ))}
-              </select>
-            </label>
-          ) : (
-            <label>
-              {draft.kind === "IN"
-                ? "Fournisseur / partenaire"
-                : "Client / destinataire"}
-              <select
-                value={draft.partner_id || ""}
-                onChange={(e) =>
-                  patch({ partner_id: Number(e.target.value) || null })
-                }
-              >
-                <option value="">Non renseigné</option>
-                {catalog.partners
-                  .filter((p) => p.active)
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-              </select>
-            </label>
-          )}
-        </div>
-        <div className="form-grid">
-          <label>
-            Référence du bon
-            <input
-              maxLength={100}
-              placeholder="BL, facture ou bon de sortie"
-              value={draft.external_reference}
-              onChange={(e) => patch({ external_reference: e.target.value })}
-            />
-          </label>
-          <label>
-            Motif
-            <input
-              required
-              maxLength={255}
-              placeholder={
-                draft.kind === "IN"
-                  ? "Réception fournisseur, retour…"
-                  : "Consommation, vente, perte…"
-              }
-              value={draft.reason}
-              onChange={(e) => patch({ reason: e.target.value })}
-            />
-          </label>
         </div>
         <div className="line-heading">
           <h3>Articles du mouvement</h3>
@@ -210,9 +117,7 @@ export function MovementForm({
               b.product_id === line.product_id &&
               b.warehouse_id === draft.warehouse_id,
           );
-          const product = catalog.products.find(
-            (p) => p.id === line.product_id,
-          );
+
           return (
             <div className="movement-line" key={index}>
               <label>
@@ -237,10 +142,7 @@ export function MovementForm({
                     </option>
                   ))}
                 </select>
-                <small>
-                  Disponible dans ce dépôt : {number(balance?.quantity || 0)}{" "}
-                  {product?.unit}
-                </small>
+                <small>Disponible : {number(balance?.quantity || 0)} </small>
               </label>
               <label>
                 Quantité

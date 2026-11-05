@@ -164,20 +164,9 @@ test(
         ).status,
         409,
       );
-      const unit = await success("/api/references/units", "POST", {
-        name: "Unit " + suffix,
-      });
-      unitIds.push(unit.id);
-      const warehouse = await success("/api/references/warehouses", "POST", {
-        name: "Warehouse " + suffix,
-        active: true,
-      });
-      warehouseIds.push(warehouse.id);
       const values = {
-        sku: "API-" + suffix,
-        name: "Article API",
+        name: "Article API " + suffix,
         category_id: category.id,
-        unit_id: unit.id,
         minimum: "5",
         cost: "10",
         active: true,
@@ -188,6 +177,11 @@ test(
       );
       const product = await success("/api/catalog", "POST", values);
       productIds.push(product.id);
+      const [autoSku] = await db.execute(
+        "SELECT sku FROM products WHERE id=?",
+        [product.id],
+      );
+      assert.match(autoSku[0].sku, /^ART-\d{8,}$/);
       async function draft(
         kind,
         quantity,
@@ -195,9 +189,6 @@ test(
       ) {
         const body = {
           kind,
-          warehouse_id: warehouse.id,
-          reason: "Test API",
-          external_reference: "BON-" + suffix,
           lines: [{ product_id: product.id, quantity }],
         };
         const result = await success(
@@ -224,7 +215,10 @@ test(
           await request(
             "/api/documents",
             "POST",
-            { ...entry.body, reason: "Autre" },
+            {
+              ...entry.body,
+              lines: [{ product_id: product.id, quantity: "99" }],
+            },
             managerToken,
             entry.key,
           )
@@ -330,7 +324,7 @@ test(
       assert.equal(simultaneous.filter((r) => r.status === 200).length, 1);
       assert.equal(simultaneous.filter((r) => r.status === 409).length, 1);
       const report = await success(
-        "/api/stock?warehouse_id=" + warehouse.id,
+        "/api/stock",
         undefined,
         undefined,
         managerToken,
@@ -361,6 +355,57 @@ test(
         (await request("/api/catalog/" + product.id, "DELETE")).status,
         409,
       );
+      const [beforeCount] = await db.execute(
+        "SELECT quantity FROM stock_balances WHERE product_id=?",
+        [product.id],
+      );
+      const expected = beforeCount[0].quantity;
+      const countBody = { product_id: product.id, expected, counted: "12.000" };
+      assert.equal(
+        (
+          await request(
+            "/api/inventory",
+            "POST",
+            countBody,
+            managerToken,
+            "manager-count-denied",
+          )
+        ).status,
+        403,
+      );
+      const correction = await success(
+        "/api/inventory",
+        "POST",
+        countBody,
+        adminToken,
+        "count-test-" + suffix,
+      );
+      if (correction.document_id) docIds.push(correction.document_id);
+      const repeatCount = await success(
+        "/api/inventory",
+        "POST",
+        countBody,
+        adminToken,
+        "count-test-" + suffix,
+      );
+      assert.equal(repeatCount.id, correction.id);
+      assert.equal(
+        (
+          await request(
+            "/api/inventory",
+            "POST",
+            { ...countBody, expected: "999" },
+            adminToken,
+            "stale-count-" + suffix,
+          )
+        ).status,
+        409,
+      );
+      const [afterCount] = await db.execute(
+        "SELECT quantity FROM stock_balances WHERE product_id=?",
+        [product.id],
+      );
+      assert.equal(afterCount[0].quantity, "12.000");
       const managerId = userIds[1];
       await success("/api/users", "PUT", {
         id: managerId,
@@ -375,6 +420,8 @@ test(
       );
     } finally {
       server.kill();
+      for (const id of productIds)
+        await db.execute("DELETE FROM stock_counts WHERE product_id=?", [id]);
       if (docIds.length) {
         const marks = docIds.map(() => "?").join(",");
         for (const table of ["audit", "ledger", "document_lines"])
