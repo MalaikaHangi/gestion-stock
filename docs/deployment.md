@@ -43,7 +43,7 @@ Variables : `DATABASE_URL`, `DATABASE_MIGRATION_URL` (directe), `ALLOWED_ORIGINS
 
 Première connexion : administrateur `danielhangi77@gmail.com` et responsable `responsable@gestion-stock.local`. Leurs mots de passe initiaux sont respectivement `ADMIN_PASSWORD` et `MANAGER_PASSWORD`, consultables dans la page Environment du service Render. L’administrateur peut ensuite modifier les comptes dans l’application.
 
-Un push sur `main` déclenche Vercel et les tests GitHub. Render déploie après réussite des checks ; son démarrage applique les nouvelles migrations PostgreSQL et préserve les données existantes.
+Un push sur `main` déclenche Vercel et les tests GitHub. Render est configuré pour attendre les checks, mais aucun déploiement automatique n’a été observé sur les derniers pushes. La connexion du dépôt au fournisseur GitHub dans Render reste à vérifier ; une URL Git publique seule ne permet pas l’auto-déploiement. La mise à jour du stock unique a été déclenchée manuellement après réussite de la CI. Le démarrage applique les migrations PostgreSQL et préserve les données existantes.
 
 ## Migrations et sauvegardes
 

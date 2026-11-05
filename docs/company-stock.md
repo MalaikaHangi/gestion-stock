@@ -13,3 +13,5 @@ Les rapports journaliers, mensuels et annuels utilisent les journées UTC. PDF e
 Squelettes animés pendant les lectures, indicateurs de traitement, media queries et tables défilantes accompagnent les opérations. La connexion permet d’afficher le mot de passe. La déconnexion demande confirmation. Les mots de passe modifiés remplacent les valeurs initiales de bootstrap ; les variables Render ne réinitialisent pas les comptes existants.
 
 Validation : compilation frontend/backend et cinq tests PostgreSQL/API/exports réussis sur une base Neon séparée. Ils couvrent permissions, SKU, idempotence, comptage périmé, quantités, sorties concurrentes, cellules Excel et PDF multipage. Le rendu visuel dans un navigateur n’a pas été vérifié durant cette intervention.
+
+Mise en ligne du 5 novembre 2026 : commit applicatif `89b6b56`, Vercel `dpl_7Wpu2mZSPbkx8YbtcKqy6u9FZUay` en état `READY`, Render `dep-dbm9srg8v5cc73e0gmk0` en état `live`. Les journaux Render confirment les migrations 003 et 004. Le déclenchement Render a été manuel après CI réussie ; la connexion GitHub du service reste à vérifier pour les prochains déploiements automatiques.
