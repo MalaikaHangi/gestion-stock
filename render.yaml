@@ -1,28 +1,73 @@
-# Configuration de l’API. À rattacher au service existant après vérification de son nom.
-# La base MySQL persistante est indépendante de ce service ; aucune base n’est recréée au déploiement.
-services:
-  - type: web
-    name: gestion-stock
-    runtime: node
-    branch: main
-    autoDeployTrigger: checksPass
-    buildCommand: npx --yes pnpm@11.25.0 install --frozen-lockfile && npx --yes pnpm@11.25.0 --filter backend build
-    startCommand: node backend/scripts/start-hosted.mjs
-    healthCheckPath: /api/health
-    envVars:
-      - key: NODE_VERSION
-        value: 24.22.1
-      - key: MYSQL_URL
-        sync: false
-      - key: MYSQL_MIGRATION_URL
-        sync: false
-      - key: ALLOWED_ORIGINS
-        sync: false
-      - key: ADMIN_EMAIL
-        sync: false
-      - key: ADMIN_PASSWORD
-        sync: false
-      - key: MANAGER_EMAIL
-        sync: false
-      - key: MANAGER_PASSWORD
-        sync: false
+# Plan only until its first sync is explicitly approved.
+# API free + MySQL 512 MB with 1 GB persistent disk, same private network.
+projects:
+  - name: gestionstock
+    environments:
+      - name: Production
+        services:
+          - type: pserv
+            name: gestion-stock-mysql
+            runtime: docker
+            region: frankfurt
+            plan: 0.5c-512mb
+            dockerfilePath: ./infra/mysql/Dockerfile
+            dockerContext: .
+            autoDeployTrigger: off
+            disk:
+              name: mysql-data
+              mountPath: /var/lib/mysql
+              sizeGB: 1
+            envVars:
+              - key: MYSQL_DATABASE
+                value: gestion_stock
+              - key: MYSQL_USER
+                value: stock_api
+              - key: MYSQL_PASSWORD
+                generateValue: true
+              - key: MYSQL_ROOT_PASSWORD
+                generateValue: true
+              - key: MYSQL_ROOT_HOST
+                value: "%"
+          - type: web
+            name: gestion-stock-api
+            runtime: node
+            region: frankfurt
+            plan: free
+            branch: main
+            autoDeployTrigger: checksPass
+            buildCommand: npx --yes pnpm@11.25.0 install --frozen-lockfile && npx --yes pnpm@11.25.0 --filter backend build
+            startCommand: node backend/scripts/start-hosted.mjs
+            healthCheckPath: /api/health
+            envVars:
+              - key: NODE_VERSION
+                value: 24.22.1
+              - key: MYSQL_HOST
+                fromService:
+                  type: pserv
+                  name: gestion-stock-mysql
+                  property: host
+              - key: MYSQL_PORT
+                value: "3306"
+              - key: MYSQL_DATABASE
+                value: gestion_stock
+              - key: MYSQL_USER
+                value: stock_api
+              - key: MYSQL_PASSWORD
+                fromService:
+                  type: pserv
+                  name: gestion-stock-mysql
+                  envVarKey: MYSQL_PASSWORD
+              - key: MYSQL_ROOT_PASSWORD
+                fromService:
+                  type: pserv
+                  name: gestion-stock-mysql
+                  envVarKey: MYSQL_ROOT_PASSWORD
+              - key: MYSQL_PROVISION_PRIVILEGES
+                value: "1"
+              # Locked down until the confirmed public Vercel origin is set.
+              - key: ALLOWED_ORIGINS
+                value: ""
+              - key: ADMIN_EMAIL
+                sync: false
+              - key: ADMIN_PASSWORD
+                generateValue: true

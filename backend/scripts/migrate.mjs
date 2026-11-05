@@ -2,17 +2,10 @@ import mysql from "mysql2/promise";
 import { readFile, readdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { splitStatements } from "./sql-statements.mjs";
+import { mysqlConfig } from "../lib/mysql-config.mjs";
 const connection = await mysql.createConnection({
-  uri: process.env.MYSQL_MIGRATION_URL || process.env.MYSQL_URL,
+  ...mysqlConfig(process.env, true),
   multipleStatements: true,
-  ...(process.env.MYSQL_SSL_CA
-    ? {
-        ssl: {
-          ca: process.env.MYSQL_SSL_CA.replace(/\\n/g, "\n"),
-          rejectUnauthorized: true,
-        },
-      }
-    : {}),
 });
 let lock;
 try {

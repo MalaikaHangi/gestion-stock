@@ -1,5 +1,7 @@
 # Vérifications de la version centrée sur les mouvements
 
+Mise à jour hébergement : quatre suites réussies, comprenant la configuration MySQL par références Render. Le Blueprint a passé le schéma JSON officiel Render. Le test d’initialisation vérifie aussi l’absence de droits DDL et d’écriture directe sur le registre pour le compte API. La validation du plan Render et le déploiement effectif sont suivis séparément.
+
 Exécutées sur le poste de développement, avec une base MySQL de test isolée ; aucune vérification de production n’est revendiquée.
 
 - Compilation frontend Vite et contrôle TypeScript : réussis, avec une URL HTTPS fictive d’API pour le build.

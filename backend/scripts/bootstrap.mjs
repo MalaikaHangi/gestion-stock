@@ -1,16 +1,9 @@
 // One-time hosted bootstrap. Repeated deploys never overwrite an existing user.
 import mysql from "mysql2/promise";
 import { scryptSync, randomBytes } from "node:crypto";
+import { mysqlConfig } from "../lib/mysql-config.mjs";
 const db = await mysql.createConnection({
-  uri: process.env.MYSQL_MIGRATION_URL || process.env.MYSQL_URL,
-  ...(process.env.MYSQL_SSL_CA
-    ? {
-        ssl: {
-          ca: process.env.MYSQL_SSL_CA.replace(/\\n/g, "\n"),
-          rejectUnauthorized: true,
-        },
-      }
-    : {}),
+  ...mysqlConfig(process.env, true),
 });
 try {
   const [[database]] = await db.query("SELECT DATABASE() name");

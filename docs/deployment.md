@@ -1,5 +1,17 @@
 # Mise en ligne sur les projets existants
 
+## Plan Render préparé le 5 novembre 2026
+
+L’accès à `Daniel’s workspace` a été confirmé. L’inventaire Render ne contient aucun service ni base : le projet `gestionstock` est encore vide.
+
+Le Blueprint définit un service `gestion-stock-api` gratuit, un service privé `gestion-stock-mysql` au plan `0.5c-512mb` et un disque de 1 Go monté sur `/var/lib/mysql`. Les services sont placés à Francfort, dans le même réseau privé. L’API reçoit l’adresse et les secrets MySQL par références entre services, sans URL contenant un mot de passe dans le dépôt. Les secrets sont générés par Render et conservés entre les synchronisations.
+
+Coût de base estimé : 7 USD/mois de calcul MySQL + 0,25 USD/mois pour 1 Go de disque = 7,25 USD/mois, hors taxes et éventuels dépassements des quotas. Le tarif provient de https://render.com/pricing ; le plan et le coût doivent être confirmés dans l’aperçu Render avant application. L’API gratuite est soumise aux limites et mises en veille de cette offre.
+
+La première synchronisation n’est pas appliquée sans autorisation explicite du plan et de son déploiement. `ALLOWED_ORIGINS` reste initialement vide, puis doit être renseigné avec l’origine publique Vercel confirmée. L’API sera ainsi fermée aux appels navigateur non autorisés pendant la configuration.
+
+Le démarrage attend MySQL, applique les migrations, provisionne les droits limités du compte API et initialise l’administrateur. Ce compte dispose seulement de SELECT sur le registre et les soldes ; les écritures de stock passent par les procédures. Il dispose de SELECT/INSERT sur l’audit. Les droits de schéma sont réservés au compte de migration. Le provisionnement est idempotent et vérifié sur une base temporaire.
+
 ## État des accès et destinations
 
 - Espace Vercel fourni : https://vercel.com/danielhangi77-2714
