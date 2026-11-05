@@ -1,67 +1,56 @@
-# StockMaster — entrées et sorties de stock
+# StockMaster — gestion des entrées et sorties
 
-Application en français destinée à fonctionner **en ligne** : interface React sur Vercel, API Next.js sur Render et base MySQL persistante. Les mouvements et utilisateurs sont enregistrés sur le serveur ; aucune base métier ni brouillon ne sont conservés dans le navigateur. Les anciennes données locales du prototype sont effacées à l’ouverture.
+Application en français, hébergée en ligne : interface React sur Vercel, API Next.js sur Render gratuit et PostgreSQL sur **Neon Free**. Aucun service payant, disque payant ni base MySQL ne fait partie du déploiement.
 
 ## Deux rôles
 
 | Fonction | Administrateur | Responsable |
 | --- | --- | --- |
 | Consulter les articles et le stock | Oui | Oui |
-| Créer/modifier/annuler des brouillons | Oui | Oui |
-| Enregistrer et valider entrées, sorties, transferts | Oui | Oui |
-| Consulter les opérations, leurs articles et leurs auteurs | Oui | Oui |
-| Filtrer et exporter les états de stock | Oui | Oui |
-| Contrepasser une opération validée | Oui | Non |
-| Gérer les articles, catégories, unités, partenaires et dépôts | Oui | Non |
-| Gérer les utilisateurs et leurs rôles | Oui | Non |
-| Consulter l’audit et configurer l’organisation | Oui | Non |
+| Créer, modifier et annuler des brouillons | Oui | Oui |
+| Valider les entrées, sorties et transferts | Oui | Oui |
+| Consulter l’historique et exporter les états | Oui | Oui |
+| Contrepasser un mouvement validé | Oui | Non |
+| Gérer les articles et référentiels | Oui | Non |
+| Gérer les utilisateurs, paramètres et audit | Oui | Non |
 
-Les contrôles sont exécutés dans l’API. Masquer un bouton ne constitue pas la protection. Un compte responsable ne peut pas accéder aux routes d’administration par appel direct. Les anciens comptes lecteurs sont désactivés, sans suppression de leurs traces historiques. Le dernier administrateur actif est protégé contre la désactivation ou le retrait de son rôle.
+Les autorisations sont contrôlées par l’API. Les comptes utilisent des mots de passe scrypt et des sessions à jeton aléatoire, haché en base. Le jeton reste en mémoire dans le navigateur. Le dernier administrateur actif ne peut pas être désactivé ou rétrogradé.
 
-## Parcours principal
+## Opérations de stock
 
-1. L’administrateur crée les catégories, unités, dépôts et articles.
-2. Le responsable prépare une **entrée** ou une **sortie**, avec dépôt, motif, référence du bon et plusieurs lignes d’articles.
-3. Le brouillon peut être consulté, modifié ou annulé. Il ne modifie pas le stock.
-4. La validation applique toutes les lignes dans une transaction. Toute quantité insuffisante annule l’ensemble de la validation.
-5. Le journal conserve référence, date, auteur, motif, articles, statut et correction éventuelle.
+L’administrateur crée les catégories, unités, dépôts et articles. Le responsable enregistre ensuite un brouillon d’entrée ou de sortie avec motif, bon, dépôt et plusieurs articles. La validation met à jour toutes les lignes dans une même transaction PostgreSQL ; le moindre échec annule tout. Les sorties qui dépassent le stock disponible sont refusées.
 
-Les documents validés ne peuvent pas être modifiés ou annulés par les routes de brouillon. Une correction administrative crée une contrepassation liée à l’original. Elle conserve l’historique et refuse aussi le stock négatif.
+Les brouillons peuvent être corrigés ou annulés sans effet sur le stock. Un document validé reste immuable dans l’API. Sa correction administrative crée une contrepassation liée à l’original, avec conservation de l’historique. Une contrepassation ne peut pas rendre le stock négatif.
 
-Le journal est paginé et filtrable par type, statut, dépôt, période, article, SKU, référence ou bon. Le CSV du journal correspond explicitement à la page affichée. L’état de stock exportable calcule ouverture, entrées, sorties et clôture sur la période sélectionnée, avec des journées UTC. Les heures affichées utilisent le fuseau de l’organisation.
+Le journal est paginé et filtrable par type, dépôt, statut, période, article, SKU, motif ou bon. L’état de stock calcule ouverture, entrées, sorties et clôture sur des journées UTC. Les heures affichées suivent le fuseau de l’organisation. Les exports sont au format CSV ; celui du journal correspond explicitement à la page affichée.
 
-## Hébergement et push GitHub
+## Hébergement gratuit
 
-Voir [le guide de déploiement](docs/deployment.md).
+- Vercel : frontend Vite, projet `gestion-stock`.
+- Render : API `gestion-stock-api`, plan explicitement `free`.
+- Neon : projet `gestion-stock`, organisation sur le plan `free`, PostgreSQL 17.
 
-- `vercel.json` : compilation du frontend depuis la racine du dépôt.
-- `render.yaml` : configuration à rattacher au service Render existant, après confirmation de son nom.
-- `.github/workflows/verify.yml` : compilation et tests sur MySQL 8.4 à chaque push sur `main`.
-- `backend/scripts/start-hosted.mjs` : migrations versionnées puis initialisation idempotente des comptes avant lancement de l’API.
+Neon Free est annoncé sans limite de durée et sans carte bancaire, dans ses quotas. PostgreSQL gratuit sur Render expire après 30 jours ; il n’a donc pas été retenu pour le stockage durable du projet. Aucune évolution vers une offre payante n’est autorisée automatiquement. Les offres gratuites ont des limites de stockage, de calcul et des mises en veille : voir [le déploiement](docs/deployment.md).
 
-Un push ne copie jamais une base de développement sur la base hébergée. Il applique uniquement les migrations SQL non encore exécutées. Les données et mots de passe existants sont conservés. Une erreur de migration empêche le démarrage de la nouvelle API.
+Les anciennes ressources MySQL n’ont jamais été déployées sur Render. Leur Blueprint a été désactivé. La configuration courante ne contient qu’une API gratuite.
 
-Le déploiement réel exige que les projets Vercel/Render soient reliés à GitHub et que leurs variables d’environnement soient configurées. La présence de ces fichiers ne prouve pas à elle seule que les comptes distants ont été configurés.
+## Après un push
 
-## Variables hébergées
+Le workflow GitHub utilise une vraie instance PostgreSQL 17 pour appliquer les migrations, compiler et tester les opérations critiques. Render peut déployer après les contrôles CI ; Vercel déploie le frontend via son intégration Git.
 
-Frontend : `VITE_API_URL` doit être l’URL HTTPS publique du backend Render. Une compilation de production sans cette URL, ou avec `localhost`, est refusée.
+Le démarrage hébergé attend PostgreSQL, applique les migrations versionnées puis initialise les comptes absents. Un nouveau push ne remet pas la base à zéro et ne change pas les mots de passe existants. Les migrations PostgreSQL sont transactionnelles et protégées par un verrou ; leur checksum interdit de modifier silencieusement une version déjà appliquée.
 
-Backend : `MYSQL_URL`, `MYSQL_MIGRATION_URL` (compte de migration si distinct), `MYSQL_SSL_CA` si requis par la base, `ALLOWED_ORIGINS` (origines exactes Vercel, séparées par des virgules). Au premier lancement : `ADMIN_EMAIL`, `ADMIN_PASSWORD`, et éventuellement `MANAGER_EMAIL`, `MANAGER_PASSWORD`. Les mots de passe initiaux comportent au moins 12 caractères et sont définis dans le gestionnaire de variables Render. Le bootstrap ne remplace jamais le mot de passe d’un compte existant.
+## Configuration
 
-Ne pas définir de secret MySQL dans les variables `VITE_*`. Les fichiers `.env` et `.local/` sont exclus de Git.
+Frontend : `VITE_API_URL` = URL HTTPS publique de l’API. La compilation de production refuse une URL locale ou absente.
 
-## Architecture et intégrité
+Backend : `DATABASE_URL` = connexion PostgreSQL ; `DATABASE_MIGRATION_URL` = connexion directe pour les migrations, notamment si la connexion applicative utilise un pooler ; `ALLOWED_ORIGINS` = origines exactes du frontend, sans barre finale. `DATABASE_SSL_CA` est facultative pour une autorité TLS spécifique. Les connexions externes vérifient le certificat TLS.
 
-`frontend/` : React, TypeScript, Vite et manifeste PWA. `backend/` : Next.js Route Handlers. `sql/` : migrations versionnées. `tests/` : tests du registre et des permissions. `docs/` : architecture, déploiement et vérifications.
+Au premier lancement : `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `MANAGER_EMAIL`, `MANAGER_PASSWORD`. Les mots de passe générés par Render restent dans les variables du service, jamais dans Git. L’alias initial du responsable est `responsable@gestion-stock.local` ; l’administrateur peut modifier son e-mail dans Utilisateurs. Aucun e-mail n’est envoyé automatiquement.
 
-Les quantités utilisent `DECIMAL(18,3)` ; les coûts `DECIMAL(18,4)`. Le registre signé des mouvements validés est la source de vérité. Les soldes sont actualisés dans la même transaction. Les références lisibles sont générées par un compteur verrouillé, par type et année UTC. Les transactions verrouillent les soldes dans l’ordre dépôt/produit. Les clés idempotentes protègent la création et la validation.
+## Développement et vérification
 
-Les sessions utilisent un jeton aléatoire de 256 bits, haché en base et valable huit heures, conservé uniquement en mémoire dans le navigateur. Les mots de passe utilisent scrypt avec sel aléatoire. Modifier ou désactiver un utilisateur révoque ses sessions. Le service worker met en cache l’enveloppe de l’interface, jamais les réponses de l’API ; une connexion est obligatoire pour se connecter et enregistrer les opérations.
-
-## Vérification pour le développement
-
-Node.js 24 et pnpm 11.25.0 sont utilisés. Pour les tests, utiliser exclusivement une base MySQL isolée et migrée, puis définir `TEST_MYSQL_URL`. La suite lance sa propre API de test sur un port temporaire. Elle crée et supprime uniquement ses données de test.
+Node.js 24, pnpm 11.25.0. Les migrations sont dans `sql/postgres/`. Pour les tests, utiliser exclusivement une base PostgreSQL séparée et définir `TEST_DATABASE_URL`.
 
 ```text
 pnpm install --frozen-lockfile
@@ -70,6 +59,8 @@ pnpm build
 pnpm test
 ```
 
-La compilation nécessite `VITE_API_URL`. La CI emploie une URL HTTPS fictive pour vérifier la compilation, sans effectuer de déploiement ni d’appel à cette URL. Les migrations nécessitent `MYSQL_MIGRATION_URL` ou `MYSQL_URL`.
+La compilation exige `VITE_API_URL`. La CI utilise une adresse HTTPS fictive pour compiler sans déployer. Les tests de transactions et d’API sont ignorés si `TEST_DATABASE_URL` est absente ; leur réussite n’est revendiquée qu’après exécution sur une vraie base.
 
-Voir [les vérifications exécutées](docs/verification.md). Les inventaires physiques avec sessions de comptage et le scan caméra ne sont pas implémentés dans cette version. Le coût affiché sert à une valorisation indicative, sans méthode comptable FIFO ou CUMP.
+Les quantités et coûts sont des NUMERIC exacts. Le registre signé est la source de vérité ; les soldes sont actualisés dans la même transaction par les fonctions PostgreSQL de validation et de contrepassation. Les clés idempotentes empêchent les doubles validations. Les références métier sont attribuées par compteur transactionnel, par type et année UTC.
+
+Le navigateur ne conserve aucune base métier ni brouillon local. Le service worker met en cache uniquement l’enveloppe de l’interface. Les opérations exigent une connexion au serveur. Les inventaires physiques avec sessions de comptage et le scan caméra ne sont pas encore implémentés ; la valorisation au coût renseigné reste indicative, sans FIFO ou CUMP.

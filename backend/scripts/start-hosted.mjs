@@ -19,7 +19,6 @@ async function run(script, args = []) {
 }
 await run(fileURLToPath(new URL("./wait-for-db.mjs", import.meta.url)));
 await run(fileURLToPath(new URL("./migrate.mjs", import.meta.url)));
-await run(fileURLToPath(new URL("./provision-db-user.mjs", import.meta.url)));
 await run(fileURLToPath(new URL("./bootstrap.mjs", import.meta.url)));
 const child = spawn(
   process.execPath,

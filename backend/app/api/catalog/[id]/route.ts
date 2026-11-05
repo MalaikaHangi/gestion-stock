@@ -1,4 +1,4 @@
-import type { ResultSetHeader } from "mysql2";
+import type { ResultSetHeader } from "../../../../lib/db";
 import { db } from "../../../../lib/db";
 import { administrator } from "../../../../lib/security";
 import { productSchema } from "../../../../lib/validation";

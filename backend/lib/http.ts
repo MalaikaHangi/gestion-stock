@@ -34,6 +34,13 @@ export function failure(request: Request, error: unknown) {
                 "ER_LOCK_DEADLOCK",
                 "ER_LOCK_WAIT_TIMEOUT",
                 "ER_SIGNAL_EXCEPTION",
+                "23505",
+                "23503",
+                "23514",
+                "40P01",
+                "40001",
+                "55P03",
+                "P0001",
               ].includes(code || "")
             ? 409
             : 500;
@@ -43,9 +50,9 @@ export function failure(request: Request, error: unknown) {
     NOT_FOUND: "Élément introuvable.",
   };
   const text =
-    code === "ER_DUP_ENTRY"
+    code === "ER_DUP_ENTRY" || code === "23505"
       ? "Cette référence existe déjà."
-      : code === "ER_ROW_IS_REFERENCED_2"
+      : code === "ER_ROW_IS_REFERENCED_2" || code === "23503"
         ? "Élément déjà utilisé : désactivez-le au lieu de le supprimer."
         : code === "ER_NO_REFERENCED_ROW_2"
           ? "Une référence sélectionnée n’existe plus."

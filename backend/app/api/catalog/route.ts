@@ -1,4 +1,4 @@
-import type { RowDataPacket, ResultSetHeader } from "mysql2";
+import type { RowDataPacket, ResultSetHeader } from "../../../lib/db";
 import { productSchema } from "../../../lib/validation";
 import { db } from "../../../lib/db";
 import { authorize, administrator } from "../../../lib/security";
@@ -11,7 +11,7 @@ export async function GET(request: Request) {
       user.role === "admin" &&
       new URL(request.url).searchParams.get("all") === "1";
     const [products] = await db().query<RowDataPacket[]>(
-      `SELECT p.*,c.name category,u.name unit,COALESCE(SUM(b.quantity),0) quantity FROM products p JOIN categories c ON c.id=p.category_id JOIN units u ON u.id=p.unit_id LEFT JOIN stock_balances b ON b.product_id=p.id ${all ? "" : "WHERE p.active=1"} GROUP BY p.id ORDER BY p.name,p.id`,
+      `SELECT p.*,c.name category,u.name unit,COALESCE(SUM(b.quantity),0) quantity FROM products p JOIN categories c ON c.id=p.category_id JOIN units u ON u.id=p.unit_id LEFT JOIN stock_balances b ON b.product_id=p.id ${all ? "" : "WHERE p.active=1"} GROUP BY p.id,c.name,u.name ORDER BY p.name,p.id`,
     );
     const [warehouses] = await db().query(
       "SELECT * FROM warehouses" + (all ? "" : " WHERE active=1"),

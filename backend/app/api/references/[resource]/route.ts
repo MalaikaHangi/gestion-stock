@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { RowDataPacket, ResultSetHeader } from "mysql2";
+import type { RowDataPacket, ResultSetHeader } from "../../../../lib/db";
 import { db } from "../../../../lib/db";
 import { administrator } from "../../../../lib/security";
 import { response, failure, preflight } from "../../../../lib/http";

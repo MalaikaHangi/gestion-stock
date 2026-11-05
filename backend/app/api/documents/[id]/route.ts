@@ -1,4 +1,4 @@
-import type { RowDataPacket } from "mysql2";
+import type { RowDataPacket } from "../../../../lib/db";
 import { db } from "../../../../lib/db";
 import { authorize } from "../../../../lib/security";
 import { movementSchema } from "../../../../lib/validation";

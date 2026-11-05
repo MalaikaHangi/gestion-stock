@@ -1,14 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-// Dedicated disposable database only. Apply migrations first; never use a production URL.
+// Dedicated disposable PostgreSQL database only. Never use a production URL.
 test(
-  "MySQL : atomicité, concurrence, transfert et idempotence",
-  { skip: !process.env.TEST_MYSQL_URL },
+  "PostgreSQL : atomicité, concurrence, transfert et idempotence",
+  { skip: !process.env.TEST_DATABASE_URL },
   async () => {
-    const { default: mysql } = await import(
-      "../backend/node_modules/mysql2/promise.js"
-    );
-    const pool = mysql.createPool(process.env.TEST_MYSQL_URL);
+    const { createDatabase } = await import("../backend/lib/postgres.mjs");
+    const pool = createDatabase(process.env.TEST_DATABASE_URL);
     let actor,
       admin,
       category,
@@ -59,7 +57,7 @@ test(
         return id;
       }
       const validate = (id) =>
-        pool.execute("CALL validate_document(?,?,?)", [
+        pool.execute("SELECT validate_document(?,?,?)", [
           id,
           actor,
           "test-validation-" + id,
@@ -101,14 +99,14 @@ test(
       await assert.rejects(validate(multiline));
       assert.equal(await balance(source), 2);
       await assert.rejects(
-        pool.execute("CALL reverse_document(?,?,?,?)", [
+        pool.execute("SELECT reverse_document(?,?,?,?)", [
           out,
           actor,
           "Correction test",
           "test-reverse-" + out,
         ]),
       );
-      await pool.execute("CALL reverse_document(?,?,?,?)", [
+      await pool.execute("SELECT reverse_document(?,?,?,?)", [
         out,
         admin,
         "Correction test",
@@ -120,7 +118,7 @@ test(
       );
       documentIds.push(reversed[0].id);
       assert.equal(await balance(source), 42);
-      await pool.execute("CALL reverse_document(?,?,?,?)", [
+      await pool.execute("SELECT reverse_document(?,?,?,?)", [
         out,
         admin,
         "Correction test",

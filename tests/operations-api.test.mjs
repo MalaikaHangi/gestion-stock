@@ -7,12 +7,10 @@ import net from "node:net";
 const require = createRequire(import.meta.url);
 test(
   "API : deux rôles, entrées/sorties, correction, filtres et protection des historiques",
-  { skip: !process.env.TEST_MYSQL_URL, timeout: 90000 },
+  { skip: !process.env.TEST_DATABASE_URL, timeout: 90000 },
   async () => {
-    const { default: mysql } = await import(
-      "../backend/node_modules/mysql2/promise.js"
-    );
-    const db = mysql.createPool(process.env.TEST_MYSQL_URL);
+    const { createDatabase } = await import("../backend/lib/postgres.mjs");
+    const db = createDatabase(process.env.TEST_DATABASE_URL);
     const reserve = net.createServer();
     await new Promise((resolve) => reserve.listen(0, "127.0.0.1", resolve));
     const port = reserve.address().port;
@@ -31,7 +29,7 @@ test(
         cwd: new URL("../backend/", import.meta.url),
         env: {
           ...process.env,
-          MYSQL_URL: process.env.TEST_MYSQL_URL,
+          DATABASE_URL: process.env.TEST_DATABASE_URL,
           NODE_ENV: "production",
           ALLOWED_ORIGINS: "https://frontend.example.invalid",
         },

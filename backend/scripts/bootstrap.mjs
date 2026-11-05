@@ -1,17 +1,14 @@
-// One-time hosted bootstrap. Repeated deploys never overwrite an existing user.
-import mysql from "mysql2/promise";
+import pg from "pg";
 import { scryptSync, randomBytes } from "node:crypto";
-import { mysqlConfig } from "../lib/mysql-config.mjs";
-const db = await mysql.createConnection({
-  ...mysqlConfig(process.env, true),
-});
+import { postgresConfig } from "../lib/postgres.mjs";
+const client = new pg.Client(postgresConfig(process.env, true));
+await client.connect();
 try {
-  const [[database]] = await db.query("SELECT DATABASE() name");
-  const [[lock]] = await db.execute("SELECT GET_LOCK(?,60) acquired", [
-    "stock-bootstrap:" + database.name,
-  ]);
-  if (lock.acquired !== 1) throw Error("Initialisation déjà en cours.");
-  for (const [prefix, role, label] of [
+  await client.query("BEGIN");
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtext('stockmaster-bootstrap'))",
+  );
+  for (const [prefix, role, name] of [
     ["ADMIN", "admin", "Administrateur"],
     ["MANAGER", "manager", "Responsable"],
   ]) {
@@ -19,35 +16,37 @@ try {
       password = process.env[prefix + "_PASSWORD"];
     if (!email && !password) continue;
     if (!email || !password || password.length < 12)
-      throw Error(
-        prefix + " : e-mail et mot de passe de 12 caractères minimum requis.",
-      );
-    const [exists] = await db.execute("SELECT id FROM users WHERE email=?", [
-      email,
-    ]);
-    if (exists.length) {
-      console.log(label + " déjà présent ; compte conservé.");
-      continue;
-    }
+      throw Error("Identifiants initiaux incomplets : " + prefix);
+    const { rows } = await client.query(
+      "SELECT id FROM users WHERE lower(email)=lower($1)",
+      [email],
+    );
+    if (rows.length) continue;
     const salt = randomBytes(16).toString("hex");
-    await db.execute(
-      "INSERT INTO users(name,email,password_hash,role) VALUES(?,?,?,?)",
+    await client.query(
+      "INSERT INTO users(name,email,password_hash,role) VALUES($1,$2,$3,$4)",
       [
-        label,
+        name,
         email,
         salt + ":" + scryptSync(password, salt, 64).toString("hex"),
         role,
       ],
     );
-    console.log(label + " initialisé.");
+    console.log(name + " initialisé.");
   }
-  const [[admins]] = await db.query(
-    "SELECT COUNT(*) total FROM users WHERE active=1 AND role='admin'",
+  const { rows } = await client.query(
+    "SELECT id FROM users WHERE role='admin' AND active=1 LIMIT 1",
   );
-  if (!admins.total)
+  if (!rows.length)
     throw Error(
-      "Aucun administrateur : configurez ADMIN_EMAIL et ADMIN_PASSWORD avant le premier déploiement.",
+      "Configurez ADMIN_EMAIL et ADMIN_PASSWORD pour le premier lancement.",
     );
+  await client.query("COMMIT");
+} catch (error) {
+  await client.query("ROLLBACK");
+  throw Error(
+    "Initialisation interrompue (" + (error.code || error.message) + ").",
+  );
 } finally {
-  await db.end();
+  await client.end();
 }

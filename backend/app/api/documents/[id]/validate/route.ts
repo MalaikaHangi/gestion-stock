@@ -16,7 +16,7 @@ export async function POST(
         { error: "Identifiant ou clé idempotente invalide" },
         400,
       );
-    await db().execute("CALL validate_document(?,?,?)", [id, user.id, key]);
+    await db().execute("SELECT validate_document(?,?,?)", [id, user.id, key]);
     return response(request, { ok: true });
   } catch (e) {
     return failure(request, e);

@@ -1,30 +1,22 @@
-import mysql from "mysql2/promise";
-import { mysqlConfig } from "../lib/mysql-config.mjs";
-for (let attempt = 0; attempt < 60; attempt++) {
-  let connection;
+import pg from "pg";
+import { postgresConfig } from "../lib/postgres.mjs";
+for (let attempt = 0; attempt < 40; attempt++) {
+  const client = new pg.Client(postgresConfig(process.env, true));
   try {
-    connection = await mysql.createConnection(mysqlConfig(process.env, true));
-    await connection.query("SELECT 1");
-    await connection.end();
-    console.log("MySQL disponible.");
+    await client.connect();
+    await client.query("SELECT 1");
+    await client.end();
+    console.log("PostgreSQL disponible.");
     break;
   } catch (error) {
-    await connection?.end().catch(() => {});
-    if (
-      ![
-        "ECONNREFUSED",
-        "ENOTFOUND",
-        "EAI_AGAIN",
-        "ETIMEDOUT",
-        "PROTOCOL_CONNECTION_LOST",
-        "ER_BAD_DB_ERROR",
-      ].includes(error.code) ||
-      attempt === 59
-    )
+    await client.end().catch(() => {});
+    if (attempt === 39 || ["28P01", "28000"].includes(error.code))
       throw Error(
-        "Connexion MySQL impossible (" + (error.code || "CONFIGURATION") + ").",
+        "Connexion PostgreSQL impossible (" +
+          (error.code || "CONNECTION") +
+          ").",
       );
-    if (attempt % 10 === 0) console.log("Attente de MySQL…");
+    if (attempt % 10 === 0) console.log("Attente de PostgreSQL…");
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
 }

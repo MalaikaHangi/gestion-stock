@@ -1,4 +1,4 @@
-import type { ResultSetHeader, RowDataPacket } from "mysql2";
+import type { ResultSetHeader, RowDataPacket } from "../../../lib/db";
 import { db } from "../../../lib/db";
 import { authorize, digest } from "../../../lib/security";
 import { movementSchema } from "../../../lib/validation";
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     }
     if (params.get("q")) {
       conditions.push(
-        "(d.reference LIKE ? OR d.reason LIKE ? OR d.external_reference LIKE ? OR EXISTS(SELECT 1 FROM document_lines dl JOIN products p ON p.id=dl.product_id WHERE dl.document_id=d.id AND (p.name LIKE ? OR p.sku LIKE ?)))",
+        "(d.reference ILIKE ? OR d.reason ILIKE ? OR d.external_reference ILIKE ? OR EXISTS(SELECT 1 FROM document_lines dl JOIN products p ON p.id=dl.product_id WHERE dl.document_id=d.id AND (p.name ILIKE ? OR p.sku ILIKE ?)))",
       );
       args.push(...Array(5).fill("%" + params.get("q") + "%"));
     }
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
         conditions.push(
           key === "from"
             ? "d.created_at>=?"
-            : "d.created_at<DATE_ADD(?,INTERVAL 1 DAY)",
+            : "d.created_at<(?::date+INTERVAL '1 day')",
         );
         args.push(params.get(key)!);
       }

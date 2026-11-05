@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import type { RowDataPacket } from "mysql2";
+import type { RowDataPacket } from "../../../lib/db";
 import { db } from "../../../lib/db";
 import { digest, verifyPassword } from "../../../lib/security";
 import { response, failure, preflight } from "../../../lib/http";
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
       return response(request, { error: "Identifiants invalides" }, 400);
     const key = digest(email.toLowerCase());
     await db().execute(
-      "INSERT INTO login_attempts (attempt_key,attempts,window_start) VALUES (?,1,UTC_TIMESTAMP()) ON DUPLICATE KEY UPDATE attempts=IF(window_start<UTC_TIMESTAMP()-INTERVAL 15 MINUTE,1,attempts+1),window_start=IF(window_start<UTC_TIMESTAMP()-INTERVAL 15 MINUTE,UTC_TIMESTAMP(),window_start)",
+      "INSERT INTO login_attempts (attempt_key,attempts,window_start) VALUES (?,1,now()) ON CONFLICT(attempt_key) DO UPDATE SET attempts=CASE WHEN login_attempts.window_start<now()-INTERVAL '15 minutes' THEN 1 ELSE login_attempts.attempts+1 END,window_start=CASE WHEN login_attempts.window_start<now()-INTERVAL '15 minutes' THEN now() ELSE login_attempts.window_start END",
       [key],
     );
     const [attempts] = await db().execute<RowDataPacket[]>(
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
         429,
       );
     const [rows] = await db().execute<RowDataPacket[]>(
-      "SELECT * FROM users WHERE email=? AND active=1",
+      "SELECT * FROM users WHERE lower(email)=lower(?) AND active=1",
       [email],
     );
     const user = rows[0];
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
       );
     const token = randomBytes(32).toString("hex");
     await db().execute(
-      "INSERT INTO sessions (token_hash,user_id,expires_at) VALUES (?,?,UTC_TIMESTAMP()+INTERVAL 8 HOUR)",
+      "INSERT INTO sessions (token_hash,user_id,expires_at) VALUES (?,?,now()+INTERVAL '8 hours')",
       [digest(token), user.id],
     );
     await db().execute("DELETE FROM login_attempts WHERE attempt_key=?", [key]);

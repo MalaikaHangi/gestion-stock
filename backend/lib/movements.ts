@@ -1,4 +1,4 @@
-import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, RowDataPacket } from "./db";
 import { db } from "./db";
 import { movementSchema } from "./validation";
 export async function checkReferences(

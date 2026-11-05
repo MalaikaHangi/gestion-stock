@@ -26,7 +26,7 @@ export async function POST(
         { error: "Motif et clé idempotente requis." },
         400,
       );
-    await db().execute("CALL reverse_document(?,?,?,?)", [
+    await db().execute("SELECT reverse_document(?,?,?,?)", [
       id,
       user.id,
       parsed.data.reason,
