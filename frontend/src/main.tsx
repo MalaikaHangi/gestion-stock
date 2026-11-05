@@ -198,9 +198,6 @@ function App() {
             {online ? <Wifi size={14} /> : <WifiOff size={14} />}{" "}
             {online ? "Connecté au serveur" : "Hors connexion"}
           </span>
-          <button className="primary" disabled={!online} onClick={() => open()}>
-            <Plus size={17} /> Nouveau mouvement
-          </button>
           <div className="profile-name">
             <b>{session.user.name}</b>
             <small>{admin ? "Administrateur" : "Responsable"}</small>
