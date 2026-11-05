@@ -2,7 +2,7 @@
 
 ## Choix confirmé
 
-La contrainte est de ne créer **aucun service payant**. Le plan MySQL privé et disque persistant n’a pas été appliqué. Le Blueprint Render existant `exs-dbm8ekl9el5s7391dkbg` a été placé en synchronisation automatique désactivée avant sa modification.
+La contrainte est de ne créer **aucun service payant**. Le plan MySQL privé et disque persistant n’a pas été appliqué. Le plan gratuit de remplacement a été approuvé puis déployé le 5 novembre 2026. Le Blueprint `exs-dbm8ekl9el5s7391dkbg` est maintenant en synchronisation automatique.
 
 PostgreSQL gratuit sur Render expire après 30 jours. Neon Free annonce une offre sans limite de durée et sans carte bancaire, avec 1 Go de stockage et 100 CU-heures mensuelles par projet au 5 novembre 2026. L’organisation Neon sélectionnée est bien au plan `free`. Les quotas et éventuelles mises en veille doivent être respectés ; aucune offre payante ni aucun dépassement facturable ne sont activés par ce dépôt.
 
@@ -11,14 +11,14 @@ Références : https://render.com/docs/free et https://neon.com/pricing.
 ## Ressources
 
 - Vercel : équipe `danielhangi77-2714`, projet principal `gestion-stock`, domaine confirmé `gestion-stock-green.vercel.app`.
-- Render : `Daniel’s workspace`, projet d’organisation fourni par l’utilisateur ; l’API est prévue au plan `free`, région Francfort.
+- Render : `Daniel’s workspace`, service `srv-dbm8r4d6e07s73bggdg0`, plan `free`, région Francfort. API : https://gestion-stock-api-ovp8.onrender.com.
 - Neon : projet `gestion-stock`, région AWS Francfort, PostgreSQL 17. La base `gestion_stock` est dédiée à l’application ; `gestion_stock_test` est séparée pour les contrôles automatisés.
 
 Le projet Vercel `gestion-stock-1fo6` est un doublon existant ; il n’est ni supprimé ni utilisé pour cette mise en ligne.
 
 ## Vercel
 
-Framework Vite, Node 24, racine du dépôt. `vercel.json` définit l’installation pnpm, la compilation du frontend et la sortie `frontend/dist`. Définir `VITE_API_URL` avec l’URL HTTPS de l’API Render et relancer un déploiement pour intégrer cette valeur dans le bundle.
+Framework Vite, Node 24, racine du dépôt. `vercel.json` définit l’installation pnpm, la compilation du frontend et la sortie `frontend/dist`. `VITE_API_URL=https://gestion-stock-api-ovp8.onrender.com` est configurée en production et preview, puis intégrée au bundle déployé.
 
 Le déploiement précédent échouait précisément parce que cette variable était absente. Les réglages du projet ont été corrigés de Next.js vers Vite. La protection Vercel n’est pas modifiée par les fichiers de ce dépôt.
 
@@ -40,6 +40,10 @@ Health check:
 Le service gratuit peut se mettre en veille après inactivité ; le premier accès peut être lent. Le health check confirme le processus, sans réveiller continuellement la base gratuite. Le démarrage contrôle la connexion et les migrations avant d’exposer l’API.
 
 Variables : `DATABASE_URL`, `DATABASE_MIGRATION_URL` (directe), `ALLOWED_ORIGINS=https://gestion-stock-green.vercel.app`, et les identifiants initiaux des deux comptes. Les mots de passe sont générés par Render. Le bootstrap ne les remplace jamais sur un compte déjà présent. Les variables de base PostgreSQL sont des secrets, uniquement côté serveur.
+
+Première connexion : administrateur `danielhangi77@gmail.com` et responsable `responsable@gestion-stock.local`. Leurs mots de passe initiaux sont respectivement `ADMIN_PASSWORD` et `MANAGER_PASSWORD`, consultables dans la page Environment du service Render. L’administrateur peut ensuite modifier les comptes dans l’application.
+
+Un push sur `main` déclenche Vercel et les tests GitHub. Render déploie après réussite des checks ; son démarrage applique les nouvelles migrations PostgreSQL et préserve les données existantes.
 
 ## Migrations et sauvegardes
 
