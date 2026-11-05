@@ -14,7 +14,7 @@ Références : https://render.com/docs/free et https://neon.com/pricing.
 - Render : `Daniel’s workspace`, service `srv-dbm8r4d6e07s73bggdg0`, plan `free`, région Francfort. API : https://gestion-stock-api-ovp8.onrender.com.
 - Neon : projet `gestion-stock`, région AWS Francfort, PostgreSQL 17. La base `gestion_stock` est dédiée à l’application ; `gestion_stock_test` est séparée pour les contrôles automatisés.
 
-Le projet Vercel `gestion-stock-1fo6` est un doublon existant ; il n’est ni supprimé ni utilisé pour cette mise en ligne.
+Le projet Vercel `gestion-stock-1fo6` est un doublon existant. Son ancienne configuration produisait un statut GitHub en échec à chaque push (absence de `VITE_API_URL`). Ses paramètres Vite/Node 24 et son URL API ont été alignés sur le projet principal ; son redéploiement a réussi et les deux statuts Vercel sont maintenant verts. L’adresse officielle demeure `gestion-stock-green.vercel.app`.
 
 ## Vercel
 
