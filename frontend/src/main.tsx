@@ -1,38 +1,796 @@
-import React,{useEffect,useState} from 'react';
-import {createRoot} from 'react-dom/client';
-import {Boxes,LayoutDashboard,ArrowDownLeft,ArrowUpRight,ArrowLeftRight,Search,Plus,Download,LogOut,Wifi,WifiOff,Package,TriangleAlert,X,ChevronRight,Warehouse,ShieldCheck} from 'lucide-react';
-import './style.css';
-type Product={id:number;sku:string;name:string;category:string;unit:string;quantity:string;minimum:string;cost:string};
-type Catalog={products:Product[];warehouses:{id:number;name:string}[];categories:{id:number;name:string}[];units:{id:number;name:string}[];syncedAt:string};
-type Doc={id:number;reference:string|null;kind:string;status:string;reason:string;created_at:string;warehouse:string;quantity:string};
-type Session={token:string;user:{id:number;name:string;role:string}};
-const API=(import.meta as unknown as {env:Record<string,string>}).env.VITE_API_URL||'http://localhost:3000';
-const demo:Catalog={products:[{id:1,sku:'MEC-001',name:'Roulement SKF 6205',category:'Pièces mécaniques',unit:'Pièce',quantity:'124',minimum:'20',cost:'18.50'},{id:2,sku:'ELE-002',name:'Disjoncteur Schneider 16A',category:'Électricité',unit:'Pièce',quantity:'8',minimum:'10',cost:'32'},{id:3,sku:'CON-003',name:'Huile hydraulique ISO 46',category:'Consommables',unit:'Litre',quantity:'240',minimum:'50',cost:'8.9'},{id:4,sku:'MEC-004',name:'Courroie trapézoïdale A42',category:'Pièces mécaniques',unit:'Pièce',quantity:'0',minimum:'15',cost:'12'},{id:5,sku:'OUT-005',name:'Clé dynamométrique 1/2″',category:'Outillage',unit:'Pièce',quantity:'32',minimum:'5',cost:'89'},{id:6,sku:'CON-006',name:'Gants de protection nitrile',category:'Consommables',unit:'Paire',quantity:'450',minimum:'100',cost:'3.2'}],warehouses:[{id:1,name:'Dépôt principal'},{id:2,name:'Atelier'}],categories:[],units:[],syncedAt:''};
-const number=(v:number)=>v.toLocaleString('fr-FR',{maximumFractionDigits:2});
-function App(){
- const [session,setSession]=useState<Session|null>(null),[preview,setPreview]=useState(true),[catalog,setCatalog]=useState<Catalog>(demo),[docs,setDocs]=useState<Doc[]>([]),[page,setPage]=useState('Tableau de bord'),[query,setQuery]=useState(''),[category,setCategory]=useState(''),[online,setOnline]=useState(navigator.onLine),[modal,setModal]=useState(false),[login,setLogin]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
- async function api(path:string,options:RequestInit={}){const result=await fetch(API+path,{...options,headers:{'Content-Type':'application/json',...(session?{Authorization:`Bearer ${session.token}`} :{}),...options.headers}});const data=await result.json();if(!result.ok)throw Error(data.error||'Erreur du serveur');return data;}
- async function refresh(){if(!session)return;try{const [c,d]=await Promise.all([api('/api/catalog'),api('/api/documents')]);setCatalog(c);setDocs(d);localStorage.setItem('stock-cache-'+session.user.id,JSON.stringify(c));setError('');}catch(e){setError((e as Error).message);const saved=localStorage.getItem('stock-cache-'+session.user.id);if(saved)setCatalog(JSON.parse(saved));}}
- useEffect(()=>{const update=()=>setOnline(navigator.onLine);window.addEventListener('online',update);window.addEventListener('offline',update);return()=>{window.removeEventListener('online',update);window.removeEventListener('offline',update);};},[]);
- useEffect(()=>{void refresh();},[session,online]);
- const filtered=catalog.products.filter(p=>(p.name+' '+p.sku).toLowerCase().includes(query.toLowerCase())&&(!category||p.category===category));const alerts=catalog.products.filter(p=>+p.quantity<=+p.minimum);const value=catalog.products.reduce((a,p)=>a+(+p.quantity)*(+p.cost),0);
- function exportCSV(){const csv='\uFEFFRéférence;Article;Catégorie;Quantité;Unité\n'+filtered.map(p=>[p.sku,p.name,p.category,p.quantity,p.unit].map(v=>'"'+String(v).replaceAll('"','""')+'"').join(';')).join('\n');const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='stock.csv';a.click();URL.revokeObjectURL(url);}
- async function logout(){try{await api('/api/auth',{method:'DELETE'});}finally{if(session){localStorage.removeItem('stock-cache-'+session.user.id);localStorage.removeItem('stock-draft-'+session.user.id);}setSession(null);setPreview(true);setCatalog(demo);setDocs([]);}}
- const nav=[{label:'Tableau de bord',icon:LayoutDashboard},{label:'Inventaire & articles',icon:Boxes},{label:'Mouvements',icon:ArrowLeftRight},{label:'Dépôts',icon:Warehouse},{label:'Rapports',icon:Download}];
- return <><header><a className="brand" href="#" onClick={e=>e.preventDefault()}><span className="brandmark"><Boxes size={25}/></span>StockMaster<span className="version">10</span></a><div className="header-right"><span className={'connection '+(!online?'offline':'')}>{online?<Wifi size={14}/>:<WifiOff size={14}/>} {online?'En ligne':'Hors connexion'}</span><button className="primary" onClick={()=>session?setModal(true):setLogin(true)}><Plus size={17}/> Nouveau mouvement</button><button className="avatar" aria-label={session?'Se déconnecter':'Se connecter'} onClick={()=>session?void logout():setLogin(true)}>{session?<LogOut size={18}/>:'MH'}</button></div></header>
- <aside><div className="workspace"><span className="workspace-icon"><Warehouse size={22}/></span><div><b>Espace de gestion</b><small>Gestion des stocks</small></div></div><p className="eyebrow">PILOTAGE DU STOCK</p><nav>{nav.map(({label,icon:Icon})=><button key={label} className={page===label?'active':''} onClick={()=>setPage(label)}><Icon size={19}/>{label}{label==='Inventaire & articles'&&<small>{catalog.products.length}</small>}</button>)}</nav><div className="sidebar-bottom"><ShieldCheck size={23}/><b>Vos stocks, sous contrôle.</b><p>Une vision claire, du dépôt au terrain.</p><span>PWA · Version 0.1</span></div></aside>
- <main><div className="breadcrumb">Espace de gestion <ChevronRight size={13}/><b>{page}</b></div>{preview&&<div className="demo-banner">Aperçu avec données de démonstration <button onClick={()=>setLogin(true)}>Connecter ma base <ChevronRight size={14}/></button></div>}{!online&&<div className="warning">Hors connexion : les quantités peuvent être anciennes. Validation des mouvements désactivée.</div>}{error&&<div role="alert" className="warning">{error}</div>}{notice&&<div role="status" className="success" onClick={()=>setNotice('')}>{notice}</div>}
- <section className="hero"><div><span className="hero-tag"><span/> CONSOLE DE GESTION DES STOCKS</span><h1>{page==='Tableau de bord'?<>Chaque article compte.<br/><em>Gardez une longueur d’avance.</em></>:page}</h1><p>Suivez vos stocks, anticipez vos besoins et simplifiez vos opérations.</p><div className="hero-meta"><Warehouse size={15}/> Tous les dépôts <span>•</span>{preview?'Données illustratives':catalog.syncedAt?'Synchronisé à '+new Date(catalog.syncedAt).toLocaleTimeString('fr-FR'):'Synchronisation en cours'}</div></div><div className="hero-art" aria-hidden="true"><div className="orbit"/><Boxes size={108} strokeWidth={1}/><span className="art-label"><ShieldCheck size={15}/> Une gestion en toute confiance</span></div></section>
- <div className="stats">{[{title:'Valeur du stock',value:number(value)+' €',detail:'Au coût d’achat · indicatif',icon:Boxes,color:'navy'},{title:'Articles référencés',value:number(catalog.products.length),detail:'Références actives',icon:Package,color:'blue'},{title:'Mouvements récents',value:preview?'—':String(docs.length),detail:preview?'Connectez-vous pour les consulter':'100 derniers documents',icon:ArrowLeftRight,color:'green'},{title:'Alertes de stock',value:String(alerts.length),detail:'Articles à réapprovisionner',icon:TriangleAlert,color:'amber'}].map(({title,value,detail,icon:Icon,color})=><article className="stat" key={title}><div><span>{title}</span><span className={'stat-icon '+color}><Icon size={20}/></span></div><strong>{value}</strong><small>{detail}</small></article>)}</div>
- {page==='Mouvements'?<section className="panel"><div className="panel-title"><div><h2>Journal des mouvements</h2><p>Documents et opérations de stock</p></div><button className="primary" onClick={()=>session?setModal(true):setLogin(true)}><Plus size={17}/> Ajouter</button></div><div className="table-scroll"><table><thead><tr><th>Référence</th><th>Type</th><th>Dépôt</th><th>Motif</th><th>Statut</th><th>Action</th></tr></thead><tbody>{docs.map(d=><tr key={d.id}><td>{d.reference||'Brouillon #'+d.id}</td><td>{d.kind==='IN'?'Entrée':d.kind==='OUT'?'Sortie':'Transfert'}</td><td>{d.warehouse}</td><td>{d.reason}</td><td>{d.status==='draft'?'Brouillon':'Validé'}</td><td>{d.status==='draft'&&session?.user.role!=='reader'&&<button disabled={!online||busy} onClick={async()=>{setBusy(true);try{await api(`/api/documents/${d.id}/validate`,{method:'POST',headers:{'Idempotency-Key':'validate-document-'+d.id}});await refresh();setNotice('Mouvement validé.');}catch(e){setError((e as Error).message);}finally{setBusy(false);}}}>Valider</button>}</td></tr>)}</tbody></table>{docs.length===0&&<p className="empty">Aucun mouvement à afficher. Connectez-vous pour consulter votre journal.</p>}</div></section>:page==='Dépôts'?<section className="panel"><div className="panel-title"><h2>Vos dépôts</h2></div>{catalog.warehouses.map(w=><div className="warehouse-row" key={w.id}><Warehouse/><b>{w.name}</b><span className="badge green">Actif</span></div>)}</section>:<div className="content-grid"><section className="panel"><div className="panel-title"><div><h2>{page==='Rapports'?'État du stock':'Inventaire des articles'} <span className="count">{catalog.products.length}</span></h2><p>Une vue d’ensemble de vos disponibilités</p></div><button className="outline" onClick={exportCSV}><Download size={16}/> Exporter CSV</button></div><div className="filters"><label className="search"><Search size={17}/><input placeholder="Rechercher un article, une référence…" value={query} onChange={e=>setQuery(e.target.value)}/></label><select aria-label="Filtrer par catégorie" value={category} onChange={e=>setCategory(e.target.value)}><option value="">Toutes les catégories</option>{[...new Set(catalog.products.map(p=>p.category))].map(c=><option key={c}>{c}</option>)}</select></div><div className="table-scroll"><table><thead><tr><th>ARTICLE / RÉFÉRENCE</th><th>CATÉGORIE</th><th>STOCK DISPONIBLE</th><th>STATUT</th></tr></thead><tbody>{filtered.map(p=><tr key={p.id}><td><div className="product-cell"><span className="product-icon"><Package size={21}/></span><div><b>{p.name}</b><small>{p.sku}</small></div></div></td><td><span className="category-label">{p.category}</span></td><td><b>{number(+p.quantity)}</b> <small>{p.unit.toLowerCase()}s</small><div className="stock-track"><span style={{width:Math.min(100,+p.quantity/Math.max(1,+p.minimum*5)*100)+'%',background:+p.quantity<=+p.minimum?'#f4b52b':'#24a584'}}/></div></td><td><span className={'badge '+(+p.quantity===0?'red':+p.quantity<=+p.minimum?'amber':'green')}><i/>{+p.quantity===0?'Rupture':+p.quantity<=+p.minimum?'Stock faible':'En stock'}</span></td></tr>)}</tbody></table>{filtered.length===0&&<p className="empty">Aucun article ne correspond à votre recherche.</p>}</div><div className="table-footer">{filtered.length} article(s) affiché(s)<span>Stock cumulé sur tous les dépôts</span></div></section><div className="right-column"><section className="panel alerts"><div className="panel-title"><h2><TriangleAlert size={18}/> Points de vigilance</h2><span className="count">{alerts.length}</span></div>{alerts.map(p=><div className="alert-item" key={p.id}><span className={+p.quantity===0?'alert-dot red':'alert-dot amber'}/><div><b>{p.name}</b><small>Disponible : {number(+p.quantity)} · Minimum : {p.minimum}</small><span>{+p.quantity===0?'Réapprovisionnement nécessaire':'Seuil minimum atteint'}</span></div></div>)}</section><section className="tip"><span className="eyebrow">SUR LE TERRAIN</span><h3>Votre dépôt dans<br/>votre poche.</h3><p>Consultez vos articles et préparez vos mouvements depuis votre téléphone.</p><span className="tip-icon"><Package size={38}/></span></section></div></div>}
- <footer><span>StockMaster · Gestion des stocks</span><span>Affichage : Africa/Johannesburg</span></footer></main>
- {login&&<div className="overlay"><section className="modal" role="dialog" aria-modal="true" aria-labelledby="login-title"><button className="close" aria-label="Fermer" onClick={()=>{setLogin(false);setError('');}}><X/></button><span className="modal-symbol"><ShieldCheck/></span><h2 id="login-title">Bienvenue dans votre espace</h2><p>Connectez-vous au serveur de votre organisation.</p><form onSubmit={async e=>{e.preventDefault();setBusy(true);const f=new FormData(e.currentTarget);try{const s=await api('/api/auth',{method:'POST',body:JSON.stringify({email:f.get('email'),password:f.get('password')})});setSession(s);setPreview(false);setCatalog({...demo,products:[]});setLogin(false);setError('');}catch(e){setError((e as Error).message);}finally{setBusy(false);}}}><label>E-mail<input required type="email" name="email" autoComplete="username"/></label><label>Mot de passe<input required type="password" name="password" autoComplete="current-password"/></label>{error&&<p role="alert" className="form-error">{error}</p>}<button className="primary full" disabled={busy||!online}>{busy?'Connexion…':'Se connecter'}</button></form></section></div>}
- {modal&&session&&<Movement catalog={catalog} session={session} online={online} close={()=>setModal(false)} submit={async data=>{await api('/api/documents',{method:'POST',body:JSON.stringify(data)});await refresh();setModal(false);setPage('Mouvements');setNotice('Brouillon créé. Validez-le dans le journal pour appliquer le mouvement.');}}/>}</>;
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { createRoot } from "react-dom/client";
+import {
+  Boxes,
+  LayoutDashboard,
+  ArrowDownLeft,
+  ArrowUpRight,
+  ArrowLeftRight,
+  Search,
+  Plus,
+  Download,
+  LogOut,
+  Wifi,
+  WifiOff,
+  Package,
+  TriangleAlert,
+  ChevronRight,
+  Warehouse,
+  ShieldCheck,
+  Users,
+  Settings as SettingsIcon,
+  BookOpen,
+  ListChecks,
+  Pencil,
+  Trash2,
+} from "lucide-react";
+import {
+  API_URL,
+  client,
+  csv,
+  number,
+  type Catalog,
+  type MovementDraft,
+  type Product,
+  type Session,
+  type Settings,
+} from "./client";
+import { MovementForm } from "./MovementForm";
+import { Movements } from "./Movements";
+import { Reports } from "./Reports";
+import { Admin, ProductForm } from "./Admin";
+import { Confirm, Empty, Message } from "./ui";
+import "./style.css";
+import "./operations.css";
+const emptyCatalog: Catalog = {
+  products: [],
+  warehouses: [],
+  categories: [],
+  units: [],
+  partners: [],
+  balances: [],
+  syncedAt: "",
+};
+const defaultSettings: Settings = {
+  organisation: "StockMaster",
+  currency: "EUR",
+  timezone: "Africa/Johannesburg",
+};
+function App() {
+  const [session, setSession] = useState<Session | null>(null),
+    [catalog, setCatalog] = useState<Catalog>(emptyCatalog),
+    [settings, setSettings] = useState(defaultSettings),
+    [page, setPage] = useState("Entrées & sorties"),
+    [online, setOnline] = useState(navigator.onLine),
+    [loading, setLoading] = useState(false),
+    [error, setError] = useState(""),
+    [notice, setNotice] = useState(""),
+    [version, setVersion] = useState(0),
+    [movement, setMovement] = useState<{
+      initial?: MovementDraft;
+      kind: MovementDraft["kind"];
+    } | null>(null),
+    [product, setProduct] = useState<Product | null | undefined>(undefined),
+    [deleting, setDeleting] = useState<Product | null>(null),
+    [query, setQuery] = useState(""),
+    [category, setCategory] = useState(""),
+    [warehouse, setWarehouse] = useState("");
+  const api = useMemo(() => client(session), [session]);
+  const admin = session?.user.role === "admin";
+  const refresh = useCallback(async () => {
+    if (!session) return;
+    setLoading(true);
+    try {
+      const [c, s] = await Promise.all([
+        api<Catalog>(
+          "/api/catalog" + (session.user.role === "admin" ? "?all=1" : ""),
+        ),
+        api<Settings>("/api/settings"),
+      ]);
+      setCatalog(c);
+      setSettings(s);
+      setError("");
+      setVersion((v) => v + 1);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, [api, session]);
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+  useEffect(() => {
+    if (session && online) void refresh();
+  }, [refresh, session, online]);
+  const signedOut = () => {
+    setSession(null);
+    setCatalog(emptyCatalog);
+    setSettings(defaultSettings);
+    setMovement(null);
+    setProduct(undefined);
+    setNotice("");
+    setError("");
+  };
+  const logout = async () => {
+    try {
+      await api("/api/auth", "DELETE");
+    } finally {
+      signedOut();
+    }
+  };
+  const open = (initial?: MovementDraft, kind: MovementDraft["kind"] = "IN") =>
+    setMovement({ initial, kind });
+  if (!session)
+    return (
+      <Login
+        connected={(s) => {
+          setSession(s);
+          setPage("Entrées & sorties");
+        }}
+        online={online}
+      />
+    );
+  const baseNav = [
+    { label: "Entrées & sorties", Icon: ArrowLeftRight },
+    { label: "Tableau de bord", Icon: LayoutDashboard },
+    { label: "Inventaire & articles", Icon: Boxes },
+    { label: "État du stock", Icon: Download },
+  ];
+  const adminNav = [
+    { label: "Référentiels", Icon: Warehouse },
+    { label: "Utilisateurs", Icon: Users },
+    { label: "Journal d’audit", Icon: ListChecks },
+    { label: "Paramètres", Icon: SettingsIcon },
+  ];
+  const products = catalog.products.map((p) => ({
+    ...p,
+    quantity: warehouse
+      ? catalog.balances.find(
+          (b) => b.product_id === p.id && String(b.warehouse_id) === warehouse,
+        )?.quantity || "0"
+      : p.quantity,
+  }));
+  const filtered = products.filter(
+    (p) =>
+      (p.name + " " + p.sku).toLowerCase().includes(query.toLowerCase()) &&
+      (!category || p.category === category),
+  );
+  const alerts = products.filter(
+    (p) => p.active && Number(p.quantity) <= Number(p.minimum),
+  );
+  const exportStock = () =>
+    csv("stock", [
+      ["SKU", "Article", "Catégorie", "Quantité", "Unité", "Statut"],
+      ...filtered.map((p) => [
+        p.sku,
+        p.name,
+        p.category,
+        p.quantity,
+        p.unit,
+        p.active ? "Actif" : "Désactivé",
+      ]),
+    ]);
+  return (
+    <>
+      <header>
+        <a
+          className="brand"
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            setPage("Entrées & sorties");
+          }}
+        >
+          <span className="brandmark">
+            <Boxes size={25} />
+          </span>
+          StockMaster<span className="version">10</span>
+        </a>
+        <div className="header-right">
+          <span className={"connection " + (!online ? "offline" : "")}>
+            {online ? <Wifi size={14} /> : <WifiOff size={14} />}{" "}
+            {online ? "Connecté au serveur" : "Hors connexion"}
+          </span>
+          <button className="primary" disabled={!online} onClick={() => open()}>
+            <Plus size={17} /> Nouveau mouvement
+          </button>
+          <div className="profile-name">
+            <b>{session.user.name}</b>
+            <small>{admin ? "Administrateur" : "Responsable"}</small>
+          </div>
+          <button
+            className="avatar"
+            aria-label="Se déconnecter"
+            title="Se déconnecter"
+            onClick={() => void logout()}
+          >
+            <LogOut size={18} />
+          </button>
+        </div>
+      </header>
+      <aside>
+        <div className="workspace">
+          <span className="workspace-icon">
+            <Warehouse size={22} />
+          </span>
+          <div>
+            <b>{settings.organisation}</b>
+            <small>
+              {admin ? "Administration du stock" : "Espace responsable"}
+            </small>
+          </div>
+        </div>
+        <p className="eyebrow">OPÉRATIONS DE STOCK</p>
+        <nav>
+          {[...baseNav, ...(admin ? adminNav : [])].map(({ label, Icon }) => (
+            <button
+              key={label}
+              className={page === label ? "active" : ""}
+              onClick={() => setPage(label)}
+            >
+              <Icon size={19} />
+              {label}
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-bottom">
+          <ShieldCheck size={23} />
+          <b>Une gestion centralisée.</b>
+          <p>Chaque entrée et sortie est conservée dans votre historique.</p>
+          <span>Données enregistrées sur le serveur</span>
+        </div>
+      </aside>
+      <main>
+        <div className="breadcrumb">
+          {settings.organisation} <ChevronRight size={13} />
+          <b>{page}</b>
+        </div>
+        {!online && (
+          <div className="warning">
+            Connexion interrompue. Les quantités affichées peuvent être
+            anciennes. Les opérations exigent une connexion au serveur.
+          </div>
+        )}
+        <Message text={error} />
+        {notice && (
+          <button className="success notice" onClick={() => setNotice("")}>
+            {notice} · Fermer
+          </button>
+        )}
+        {loading && (
+          <p role="status" className="loading">
+            Actualisation du stock…
+          </p>
+        )}
+        {page === "Entrées & sorties" ? (
+          <>
+            <div className="page-intro">
+              <div>
+                <span className="eyebrow">LE CŒUR DE VOTRE ACTIVITÉ</span>
+                <h1>
+                  Vos entrées. Vos sorties.
+                  <br />
+                  <em>Votre stock, en toute clarté.</em>
+                </h1>
+                <p>
+                  Enregistrez, vérifiez et retrouvez chaque mouvement de
+                  marchandise.
+                </p>
+              </div>
+              <div className="quick-actions">
+                <button
+                  className="quick-in"
+                  disabled={!online}
+                  onClick={() => open(undefined, "IN")}
+                >
+                  <ArrowDownLeft /> Enregistrer une entrée
+                </button>
+                <button
+                  className="quick-out"
+                  disabled={!online}
+                  onClick={() => open(undefined, "OUT")}
+                >
+                  <ArrowUpRight /> Enregistrer une sortie
+                </button>
+              </div>
+            </div>
+            <Movements
+              api={api}
+              catalog={catalog}
+              settings={settings}
+              admin={admin}
+              online={online}
+              version={version}
+              open={open}
+              changed={refresh}
+            />
+          </>
+        ) : page === "État du stock" ? (
+          <Reports
+            api={api}
+            catalog={catalog}
+            settings={settings}
+            version={version}
+          />
+        ) : admin && adminNav.some((n) => n.label === page) ? (
+          <Admin
+            page={page}
+            api={api}
+            catalog={catalog}
+            settings={settings}
+            changed={refresh}
+            currentId={session.user.id}
+            signedOut={signedOut}
+          />
+        ) : (
+          <>
+            {page === "Tableau de bord" && (
+              <>
+                <section className="hero">
+                  <div>
+                    <span className="hero-tag">
+                      <span /> GESTION CENTRALISÉE DES STOCKS
+                    </span>
+                    <h1>
+                      Chaque article compte.
+                      <br />
+                      <em>Gardez une longueur d’avance.</em>
+                    </h1>
+                    <p>
+                      Vos disponibilités, calculées à partir des mouvements
+                      validés.
+                    </p>
+                    <div className="hero-meta">
+                      <Warehouse size={15} /> Tous les dépôts <span>•</span>
+                      {catalog.syncedAt
+                        ? "Actualisé à " +
+                          new Date(catalog.syncedAt).toLocaleTimeString(
+                            "fr-FR",
+                            { timeZone: settings.timezone },
+                          )
+                        : "En cours de chargement"}
+                    </div>
+                  </div>
+                  <div className="hero-art" aria-hidden="true">
+                    <div className="orbit" />
+                    <Boxes size={108} strokeWidth={1} />
+                    <span className="art-label">
+                      <ShieldCheck size={15} /> Chaque mouvement est traçable
+                    </span>
+                  </div>
+                </section>
+                <div className="stats">
+                  {[
+                    {
+                      label: "Articles actifs",
+                      value: number(
+                        catalog.products.filter((p) => p.active).length,
+                      ),
+                      Icon: Package,
+                      color: "blue",
+                    },
+                    {
+                      label: "Dépôts actifs",
+                      value: number(
+                        catalog.warehouses.filter((w) => w.active).length,
+                      ),
+                      Icon: Warehouse,
+                      color: "navy",
+                    },
+                    {
+                      label: "Alertes de stock",
+                      value: number(alerts.length),
+                      Icon: TriangleAlert,
+                      color: "amber",
+                    },
+                    {
+                      label: "Valeur indicative",
+                      value:
+                        number(
+                          catalog.products.reduce(
+                            (sum, p) =>
+                              sum + Number(p.quantity) * Number(p.cost),
+                            0,
+                          ),
+                        ) +
+                        " " +
+                        settings.currency,
+                      Icon: Boxes,
+                      color: "green",
+                    },
+                  ].map(({ label, value, Icon, color }) => (
+                    <article className="stat" key={label}>
+                      <div>
+                        <span>{label}</span>
+                        <span className={"stat-icon " + color}>
+                          <Icon size={20} />
+                        </span>
+                      </div>
+                      <strong>{value}</strong>
+                      <small>Données du serveur</small>
+                    </article>
+                  ))}
+                </div>
+              </>
+            )}
+            <div className="content-grid">
+              <section className="panel">
+                <div className="panel-title">
+                  <div>
+                    <h2>
+                      Inventaire des articles{" "}
+                      <span className="count">{catalog.products.length}</span>
+                    </h2>
+                    <p>
+                      {admin
+                        ? "Gérez vos articles et consultez leur disponibilité."
+                        : "Consultez la disponibilité avant chaque opération."}
+                    </p>
+                  </div>
+                  <div className="row-actions">
+                    <button className="outline" onClick={exportStock}>
+                      <Download size={16} /> CSV
+                    </button>
+                    {admin && (
+                      <button
+                        className="primary"
+                        onClick={() => setProduct(null)}
+                      >
+                        <Plus size={16} /> Article
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="filters">
+                  <label className="search">
+                    <Search size={17} />
+                    <input
+                      aria-label="Rechercher un article"
+                      placeholder="Article, SKU…"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                    />
+                  </label>
+                  <select
+                    aria-label="Catégorie"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                  >
+                    <option value="">Toutes les catégories</option>
+                    {[...new Set(catalog.products.map((p) => p.category))].map(
+                      (c) => (
+                        <option key={c}>{c}</option>
+                      ),
+                    )}
+                  </select>
+                  <select
+                    aria-label="Dépôt"
+                    value={warehouse}
+                    onChange={(e) => setWarehouse(e.target.value)}
+                  >
+                    <option value="">Tous les dépôts</option>
+                    {catalog.warehouses.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="table-scroll">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>ARTICLE / RÉFÉRENCE</th>
+                        <th>CATÉGORIE</th>
+                        <th>DISPONIBLE</th>
+                        <th>STATUT</th>
+                        {admin && <th>ACTIONS</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map((p) => (
+                        <tr key={p.id}>
+                          <td>
+                            <div className="product-cell">
+                              <span className="product-icon">
+                                <Package size={21} />
+                              </span>
+                              <div>
+                                <b>{p.name}</b>
+                                <small>{p.sku}</small>
+                              </div>
+                            </div>
+                          </td>
+                          <td>{p.category}</td>
+                          <td>
+                            <b>{number(p.quantity)}</b> <small>{p.unit}</small>
+                          </td>
+                          <td>
+                            <span
+                              className={
+                                "badge " +
+                                (!p.active
+                                  ? "navy"
+                                  : Number(p.quantity) === 0
+                                    ? "red"
+                                    : Number(p.quantity) <= Number(p.minimum)
+                                      ? "amber"
+                                      : "green")
+                              }
+                            >
+                              {!p.active
+                                ? "Désactivé"
+                                : Number(p.quantity) === 0
+                                  ? "Rupture"
+                                  : Number(p.quantity) <= Number(p.minimum)
+                                    ? "Stock faible"
+                                    : "En stock"}
+                            </span>
+                          </td>
+                          {admin && (
+                            <td>
+                              <div className="row-actions">
+                                <button
+                                  aria-label={"Modifier " + p.name}
+                                  onClick={() => setProduct(p)}
+                                >
+                                  <Pencil size={16} />
+                                </button>
+                                <button
+                                  aria-label={"Supprimer " + p.name}
+                                  onClick={() => setDeleting(p)}
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {!filtered.length && (
+                    <Empty>
+                      {catalog.products.length
+                        ? "Aucun article pour ces critères."
+                        : admin
+                          ? "Ajoutez les catégories, unités et dépôts dans Référentiels, puis créez vos articles."
+                          : "L’administrateur doit d’abord créer les articles du catalogue."}
+                    </Empty>
+                  )}
+                </div>
+                <div className="table-footer">
+                  {filtered.length} article(s)
+                  <span>Les brouillons ne modifient pas le stock</span>
+                </div>
+              </section>
+              <div className="right-column">
+                <section className="panel alerts">
+                  <div className="panel-title">
+                    <h2>
+                      <TriangleAlert size={18} /> Points de vigilance
+                    </h2>
+                    <span className="count">{alerts.length}</span>
+                  </div>
+                  {alerts.slice(0, 10).map((p) => (
+                    <div className="alert-item" key={p.id}>
+                      <span
+                        className={
+                          Number(p.quantity) === 0
+                            ? "alert-dot red"
+                            : "alert-dot amber"
+                        }
+                      />
+                      <div>
+                        <b>{p.name}</b>
+                        <small>
+                          Disponible : {number(p.quantity)} · Minimum :{" "}
+                          {number(p.minimum)}
+                        </small>
+                      </div>
+                    </div>
+                  ))}
+                  {!alerts.length && <Empty>Aucune alerte de stock.</Empty>}
+                </section>
+                <section className="tip">
+                  <span className="eyebrow">CHAQUE OPÉRATION COMPTE</span>
+                  <h3>
+                    Un historique
+                    <br />
+                    toujours accessible.
+                  </h3>
+                  <p>
+                    Retrouvez le bon, les articles et l’auteur de chaque entrée
+                    ou sortie.
+                  </p>
+                  <button
+                    className="outline"
+                    onClick={() => setPage("Entrées & sorties")}
+                  >
+                    <BookOpen size={14} /> Ouvrir le journal
+                  </button>
+                </section>
+              </div>
+            </div>
+          </>
+        )}
+        <footer>
+          <span>{settings.organisation} · StockMaster</span>
+          <span>Affichage : {settings.timezone}</span>
+        </footer>
+      </main>
+      {movement && (
+        <MovementForm
+          catalog={catalog}
+          api={api}
+          initial={movement.initial}
+          kind={movement.kind}
+          online={online}
+          close={() => setMovement(null)}
+          saved={async () => {
+            await refresh();
+            setPage("Entrées & sorties");
+            setNotice(
+              "Brouillon enregistré. Vérifiez-le puis validez-le pour mettre à jour le stock.",
+            );
+          }}
+        />
+      )}
+      {product !== undefined && (
+        <ProductForm
+          api={api}
+          catalog={catalog}
+          product={product || undefined}
+          close={() => setProduct(undefined)}
+          saved={refresh}
+        />
+      )}
+      {deleting && (
+        <Confirm
+          title="Supprimer cet article ?"
+          description={
+            "L’article « " +
+            deleting.name +
+            " » sera supprimé s’il n’a aucune dépendance. Pour un article déjà utilisé, désactivez-le depuis Modifier."
+          }
+          close={() => setDeleting(null)}
+          confirm={async () => {
+            await api("/api/catalog/" + deleting.id, "DELETE");
+            await refresh();
+          }}
+        />
+      )}
+    </>
+  );
 }
-function Movement({catalog,session,online,close,submit}:{catalog:Catalog;session:Session;online:boolean;close:()=>void;submit:(data:unknown)=>Promise<void>}){
- const key='stock-draft-'+session.user.id;const [draft,setDraft]=useState(()=>{try{return JSON.parse(localStorage.getItem(key)||'null')||{kind:'IN',warehouse_id:catalog.warehouses[0]?.id,product_id:catalog.products[0]?.id,quantity:'1',reason:'',destination_id:catalog.warehouses[1]?.id};}catch{return {kind:'IN',warehouse_id:1,product_id:1,quantity:'1',reason:'',destination_id:2};}});const [error,setError]=useState(''),[busy,setBusy]=useState(false);
- const field=(name:string,value:string)=>setDraft({...draft,[name]:name.endsWith('_id')?Number(value):value});
- return <div className="overlay"><section className="modal" role="dialog" aria-modal="true" aria-labelledby="movement-title"><button className="close" aria-label="Fermer" onClick={close}><X/></button><span className="eyebrow">OPÉRATIONS DE STOCK</span><h2 id="movement-title">Nouveau mouvement</h2><p>Préparez un brouillon avant de le valider.</p><form onSubmit={async e=>{e.preventDefault();setBusy(true);try{await submit({kind:draft.kind,warehouse_id:draft.warehouse_id,destination_id:draft.kind==='TRANSFER'?draft.destination_id:null,reason:draft.reason,lines:[{product_id:draft.product_id,quantity:draft.quantity}]});localStorage.removeItem(key);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}}><div className="type-switch">{[['IN','Entrée',ArrowDownLeft],['OUT','Sortie',ArrowUpRight],['TRANSFER','Transfert',ArrowLeftRight]].map(([value,label,Icon])=>{const I=Icon as typeof ArrowDownLeft;return <button type="button" key={String(value)} className={draft.kind===value?'selected':''} onClick={()=>field('kind',String(value))}><I size={18}/>{String(label)}</button>;})}</div><label>Dépôt<select value={draft.warehouse_id} onChange={e=>field('warehouse_id',e.target.value)}>{catalog.warehouses.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label>{draft.kind==='TRANSFER'&&<label>Destination<select value={draft.destination_id} onChange={e=>field('destination_id',e.target.value)}>{catalog.warehouses.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select></label>}<label>Article<select value={draft.product_id} onChange={e=>field('product_id',e.target.value)}>{catalog.products.map(p=><option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}</select></label><label>Quantité<input required type="number" min="0.001" step="0.001" value={draft.quantity} onChange={e=>field('quantity',e.target.value)}/></label><label>Motif<input required maxLength={255} value={draft.reason} onChange={e=>field('reason',e.target.value)} placeholder="Réception fournisseur, consommation atelier…"/></label>{error&&<p role="alert" className="form-error">{error}</p>}<div className="form-actions"><button type="button" className="outline" onClick={()=>{localStorage.setItem(key,JSON.stringify(draft));setError('Brouillon enregistré sur cet appareil.');}}>Garder sur l’appareil</button><button className="primary" disabled={!online||busy||session.user.role==='reader'}>{busy?'Enregistrement…':'Créer le brouillon'}</button></div>{!online&&<p>Connexion requise pour envoyer le brouillon au serveur.</p>}</form></section></div>;
+function Login({
+  connected,
+  online,
+}: {
+  connected: (session: Session) => void;
+  online: boolean;
+}) {
+  const [error, setError] = useState(""),
+    [busy, setBusy] = useState(false);
+  const api = useMemo(() => client(null), []);
+  return (
+    <div className="login-screen">
+      <section className="login-intro">
+        <a className="brand" href="#">
+          <span className="brandmark">
+            <Boxes size={28} />
+          </span>
+          StockMaster <span className="version">10</span>
+        </a>
+        <span className="hero-tag">GESTION DES ENTRÉES ET SORTIES</span>
+        <h1>
+          Le bon mouvement.
+          <br />
+          <em>Au bon moment.</em>
+        </h1>
+        <p>
+          Un stock centralisé, deux rôles et une traçabilité complète de vos
+          opérations.
+        </p>
+        <div className="login-features">
+          <span>
+            <ArrowDownLeft size={20} /> Réceptions & approvisionnements
+          </span>
+          <span>
+            <ArrowUpRight size={20} /> Sorties & consommations
+          </span>
+          <span>
+            <ShieldCheck size={20} /> Historique et contrôle des stocks
+          </span>
+        </div>
+      </section>
+      <section className="login-card">
+        <span className="modal-symbol">
+          <ShieldCheck />
+        </span>
+        <h2>Connexion à votre espace</h2>
+        <p>Administrateur ou responsable, retrouvez votre stock en ligne.</p>
+        <form
+          onSubmit={async (event) => {
+            event.preventDefault();
+            setBusy(true);
+            setError("");
+            const f = new FormData(event.currentTarget);
+            try {
+              connected(
+                await api<Session>("/api/auth", "POST", {
+                  email: f.get("email"),
+                  password: f.get("password"),
+                }),
+              );
+            } catch (e) {
+              setError((e as Error).message);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <label>
+            E-mail
+            <input required type="email" name="email" autoComplete="username" />
+          </label>
+          <label>
+            Mot de passe
+            <input
+              required
+              type="password"
+              name="password"
+              autoComplete="current-password"
+            />
+          </label>
+          <Message text={error} />
+          {!online && (
+            <p className="form-error">Une connexion Internet est nécessaire.</p>
+          )}
+          {!API_URL && (
+            <p className="form-error">
+              Le serveur de l’application doit être configuré par
+              l’administrateur.
+            </p>
+          )}
+          <button
+            className="primary full"
+            disabled={busy || !online || !API_URL}
+          >
+            {busy ? "Connexion…" : "Se connecter"}
+          </button>
+        </form>
+        <p className="login-footer">
+          Vos données sont enregistrées sur le serveur de votre organisation.
+        </p>
+      </section>
+    </div>
+  );
 }
-createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);
-if((import.meta as unknown as {env:{PROD:boolean}}).env.PROD&&'serviceWorker' in navigator)window.addEventListener('load',()=>{navigator.serviceWorker.register('/sw.js').catch(console.error);});
+// Remove browser-only records from the early prototype; operational data now lives on the server.
+try {
+  for (const key of Object.keys(localStorage))
+    if (key.startsWith("stock-cache-") || key.startsWith("stock-draft-"))
+      localStorage.removeItem(key);
+} catch {
+  // The application also works when browser storage is disabled.
+}
+createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);
+if (
+  (import.meta as unknown as { env: { PROD: boolean } }).env.PROD &&
+  "serviceWorker" in navigator
+)
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(console.error);
+  });

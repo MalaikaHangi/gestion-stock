@@ -1,0 +1,44 @@
+name: Vérifier les stocks
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-only-password
+          MYSQL_DATABASE: gestion_stock_test
+          MYSQL_ROOT_HOST: "%"
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      MYSQL_URL: mysql://root:ci-only-password@127.0.0.1:3306/gestion_stock_test
+      TEST_MYSQL_URL: mysql://root:ci-only-password@127.0.0.1:3306/gestion_stock_test
+      VITE_API_URL: https://api.example.invalid
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Activer pnpm
+        run: npm install --global pnpm@11.25.0
+      - name: Installer les dépendances
+        run: pnpm install --frozen-lockfile
+      - name: Migrer la base de test
+        run: pnpm --filter backend migrate
+      - name: Compiler les applications
+        run: pnpm build
+      - name: Vérifier les transactions et permissions
+        run: pnpm test

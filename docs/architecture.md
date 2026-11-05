@@ -1,5 +1,7 @@
 # Première étape et modèle relationnel
 
+> Mise à jour : la version actuelle ajoute les deux rôles administrateur/responsable, les référentiels administrables, les brouillons multilignes, les corrections par contrepassation, l’audit, les états par période et le déploiement hébergé. Le détail historique ci-dessous décrit les fondations ; les parcours actuels sont documentés dans le README.
+
 Le périmètre de cette première étape est la consultation du catalogue et la saisie/validation de documents IN, OUT et TRANSFER. Les inventaires et contrepassations n’ont pas encore de commande métier exposée : ils sont réservés dans le modèle mais refusés par la procédure actuelle.
 
 | Parent | Enfant | Cardinalité / rôle |

@@ -1,90 +1,75 @@
-# StockMaster — gestion-stock
+# StockMaster — entrées et sorties de stock
 
-Application de gestion des stocks en français. Première étape du projet : tableau de bord React responsive, API Next.js, authentification et registre MySQL transactionnel.
+Application en français destinée à fonctionner **en ligne** : interface React sur Vercel, API Next.js sur Render et base MySQL persistante. Les mouvements et utilisateurs sont enregistrés sur le serveur ; aucune base métier ni brouillon ne sont conservés dans le navigateur. Les anciennes données locales du prototype sont effacées à l’ouverture.
 
-## État réel
+## Deux rôles
 
-L’aperçu utilise des données de démonstration explicitement signalées. Aucune donnée réelle n’est envoyée avant connexion. Le mode connecté nécessite une base MySQL et un compte initialisé.
-
-Implémenté : inventaire avec recherche et filtre, alertes, export CSV, connexion, consultation des dépôts, création de brouillons, validation des entrées/sorties/transferts, refus du stock négatif, clés idempotentes, journal des documents, manifeste et cache de la PWA, préparation locale d’un brouillon par utilisateur.
-
-À compléter avant production : CRUD complet des référentiels, permissions granulaires, inventaires physiques, contrepassations, scan caméra et rapports par période. Les migrations et le test de concurrence ont été exercés sur MySQL 8.4.13 local. Cette étape reste une version de développement.
-
-## Installation locale
-
-Prérequis : Node.js 24 LTS, pnpm 11 et MySQL 8.4/InnoDB. Depuis la racine :
-
-```powershell
-pnpm install
-Copy-Item backend/.env.example backend/.env
-Copy-Item frontend/.env.example frontend/.env
-```
-
-Créer une base `gestion_stock` en UTF-8 (`utf8mb4`) et renseigner `MYSQL_URL`. Pour les commandes de migration et de seed, utiliser les variables d’environnement du terminal (les scripts ne chargent pas automatiquement `.env`) :
-
-```powershell
-$env:MYSQL_URL='mysql://stock:mot-de-passe@localhost:3306/gestion_stock'
-pnpm --filter backend migrate
-$env:ADMIN_EMAIL='votre-adresse@example.com'
-$env:ADMIN_PASSWORD='un-mot-de-passe-long-et-unique'
-pnpm --filter backend seed
-pnpm dev
-```
-
-Frontend : http://localhost:5173 ; backend : http://localhost:3000. `pnpm build` compile les deux applications.
-
-Si Defender bloque les écritures dans Documents, autoriser les exécutables Git et Node concernés dans l’accès contrôlé aux dossiers ; conserver la protection activée.
-
-### MySQL local sans service Windows
-
-Les scripts Windows peuvent préparer MySQL 8.4.13 dans `%LOCALAPPDATA%\StockMaster`, avec une écoute limitée à `127.0.0.1:3307`. Aucune règle de pare-feu et aucun service système ne sont ajoutés. Le téléchargement minimal utilise des plages HTTP de l’archive officielle et vérifie chaque fichier avec son CRC ZIP ; l’autre méthode télécharge l’archive complète et vérifie son MD5 officiel.
-
-```powershell
-node scripts/inspect-mysql-archive.mjs
-node scripts/download-mysql-minimal.mjs
-node scripts/setup-mysql-local.mjs
-```
-
-Cette préparation crée `gestion_stock` et `gestion_stock_test` ainsi qu’un compte **de développement** ayant les droits de migration sur ces deux bases. Le compte de production devra avoir des droits réduits. `backend/.env` contient l’accès local et le mot de passe du compte applicatif `admin@stockmaster.local`, à créer ensuite avec le seed. Les identifiants sont exclus de Git.
-
-Après préparation, exécuter successivement :
-
-```powershell
-node scripts/local-db-task.mjs migrate
-node scripts/local-db-task.mjs migrate-test
-node scripts/local-db-task.mjs seed
-node scripts/local-db-task.mjs test
-```
-
-Les migrations locales utilisent le compte administrateur MySQL pour créer la fonction SQL sans réduire les protections du serveur. Le seed initial est à lancer une seule fois. Les fichiers locaux de cette installation ont déjà été préparés pendant le développement ; ne pas relancer le seed sur ces mêmes données.
-
-Pour redémarrer le serveur local ultérieurement : `node scripts/start-mysql-local.mjs`. Les migrations et le seed restent à exécuter après cette préparation. Ne pas relancer setup lorsqu’un serveur occupe déjà le port 3307.
-
-## Architecture et règles
-
-`frontend/` : React, TypeScript et Vite, sans secret. `backend/` : Next.js Route Handlers, connexion MySQL côté serveur. `sql/` : migrations ordonnées. `docs/` : architecture et déploiement.
-
-Les quantités utilisent DECIMAL(18,3), les coûts DECIMAL(18,4). Les données API conservent ces décimaux sous forme de chaînes ; les calculs financiers d’affichage sont indicatifs. Les dates métier sont enregistrées en UTC ; affichage prévu Africa/Johannesburg.
-
-Le registre `ledger` constitue la source de vérité. Les soldes sont mis à jour dans la même transaction par `validate_document`. Les documents brouillons n’affectent pas le stock. La procédure possède sa transaction : aucun appel à l’intérieur d’une transaction applicative. Les références métier ont un compteur verrouillé par type et année UTC. Un rollback restitue le compteur transactionnel ; les identifiants techniques peuvent avoir des trous.
-
-Les sessions utilisent un jeton aléatoire de 256 bits, haché en base, valable 8 heures. Le navigateur garde le jeton en mémoire uniquement. Les mots de passe utilisent scrypt et un sel aléatoire. L’API exige le rôle gestionnaire ou administrateur pour écrire. La limitation des tentatives par compte est persistante ; une protection par IP au niveau du proxy reste à configurer. CORS utilise une liste d’origines explicite, sans cookies interdomaines.
-
-Le service worker ne met pas en cache les requêtes API. Le catalogue consulté est enregistré séparément par utilisateur et effacé à la déconnexion ; il peut être ancien hors connexion. Les brouillons locaux ne sont pas synchronisés automatiquement. Aucune validation hors connexion.
-
-## API de cette étape
-
-| Méthode | Route | Accès |
+| Fonction | Administrateur | Responsable |
 | --- | --- | --- |
-| GET | `/api/health` | Public, état base |
-| POST | `/api/auth` | Connexion |
-| DELETE | `/api/auth` | Révocation du jeton courant |
-| GET | `/api/catalog` | Utilisateur connecté |
-| POST | `/api/catalog` | Gestionnaire, création de produit |
-| GET | `/api/documents` | Utilisateur connecté, 100 derniers documents |
-| POST | `/api/documents` | Gestionnaire, création brouillon |
-| POST | `/api/documents/:id/validate` | Gestionnaire, en-tête `Idempotency-Key` requis |
+| Consulter les articles et le stock | Oui | Oui |
+| Créer/modifier/annuler des brouillons | Oui | Oui |
+| Enregistrer et valider entrées, sorties, transferts | Oui | Oui |
+| Consulter les opérations, leurs articles et leurs auteurs | Oui | Oui |
+| Filtrer et exporter les états de stock | Oui | Oui |
+| Contrepasser une opération validée | Oui | Non |
+| Gérer les articles, catégories, unités, partenaires et dépôts | Oui | Non |
+| Gérer les utilisateurs et leurs rôles | Oui | Non |
+| Consulter l’audit et configurer l’organisation | Oui | Non |
 
-## Déploiement
+Les contrôles sont exécutés dans l’API. Masquer un bouton ne constitue pas la protection. Un compte responsable ne peut pas accéder aux routes d’administration par appel direct. Les anciens comptes lecteurs sont désactivés, sans suppression de leurs traces historiques. Le dernier administrateur actif est protégé contre la désactivation ou le retrait de son rôle.
 
-Voir [docs/deployment.md](docs/deployment.md). Aucun déploiement ni service payant n’est créé par ces fichiers.
+## Parcours principal
+
+1. L’administrateur crée les catégories, unités, dépôts et articles.
+2. Le responsable prépare une **entrée** ou une **sortie**, avec dépôt, motif, référence du bon et plusieurs lignes d’articles.
+3. Le brouillon peut être consulté, modifié ou annulé. Il ne modifie pas le stock.
+4. La validation applique toutes les lignes dans une transaction. Toute quantité insuffisante annule l’ensemble de la validation.
+5. Le journal conserve référence, date, auteur, motif, articles, statut et correction éventuelle.
+
+Les documents validés ne peuvent pas être modifiés ou annulés par les routes de brouillon. Une correction administrative crée une contrepassation liée à l’original. Elle conserve l’historique et refuse aussi le stock négatif.
+
+Le journal est paginé et filtrable par type, statut, dépôt, période, article, SKU, référence ou bon. Le CSV du journal correspond explicitement à la page affichée. L’état de stock exportable calcule ouverture, entrées, sorties et clôture sur la période sélectionnée, avec des journées UTC. Les heures affichées utilisent le fuseau de l’organisation.
+
+## Hébergement et push GitHub
+
+Voir [le guide de déploiement](docs/deployment.md).
+
+- `vercel.json` : compilation du frontend depuis la racine du dépôt.
+- `render.yaml` : configuration à rattacher au service Render existant, après confirmation de son nom.
+- `.github/workflows/verify.yml` : compilation et tests sur MySQL 8.4 à chaque push sur `main`.
+- `backend/scripts/start-hosted.mjs` : migrations versionnées puis initialisation idempotente des comptes avant lancement de l’API.
+
+Un push ne copie jamais une base de développement sur la base hébergée. Il applique uniquement les migrations SQL non encore exécutées. Les données et mots de passe existants sont conservés. Une erreur de migration empêche le démarrage de la nouvelle API.
+
+Le déploiement réel exige que les projets Vercel/Render soient reliés à GitHub et que leurs variables d’environnement soient configurées. La présence de ces fichiers ne prouve pas à elle seule que les comptes distants ont été configurés.
+
+## Variables hébergées
+
+Frontend : `VITE_API_URL` doit être l’URL HTTPS publique du backend Render. Une compilation de production sans cette URL, ou avec `localhost`, est refusée.
+
+Backend : `MYSQL_URL`, `MYSQL_MIGRATION_URL` (compte de migration si distinct), `MYSQL_SSL_CA` si requis par la base, `ALLOWED_ORIGINS` (origines exactes Vercel, séparées par des virgules). Au premier lancement : `ADMIN_EMAIL`, `ADMIN_PASSWORD`, et éventuellement `MANAGER_EMAIL`, `MANAGER_PASSWORD`. Les mots de passe initiaux comportent au moins 12 caractères et sont définis dans le gestionnaire de variables Render. Le bootstrap ne remplace jamais le mot de passe d’un compte existant.
+
+Ne pas définir de secret MySQL dans les variables `VITE_*`. Les fichiers `.env` et `.local/` sont exclus de Git.
+
+## Architecture et intégrité
+
+`frontend/` : React, TypeScript, Vite et manifeste PWA. `backend/` : Next.js Route Handlers. `sql/` : migrations versionnées. `tests/` : tests du registre et des permissions. `docs/` : architecture, déploiement et vérifications.
+
+Les quantités utilisent `DECIMAL(18,3)` ; les coûts `DECIMAL(18,4)`. Le registre signé des mouvements validés est la source de vérité. Les soldes sont actualisés dans la même transaction. Les références lisibles sont générées par un compteur verrouillé, par type et année UTC. Les transactions verrouillent les soldes dans l’ordre dépôt/produit. Les clés idempotentes protègent la création et la validation.
+
+Les sessions utilisent un jeton aléatoire de 256 bits, haché en base et valable huit heures, conservé uniquement en mémoire dans le navigateur. Les mots de passe utilisent scrypt avec sel aléatoire. Modifier ou désactiver un utilisateur révoque ses sessions. Le service worker met en cache l’enveloppe de l’interface, jamais les réponses de l’API ; une connexion est obligatoire pour se connecter et enregistrer les opérations.
+
+## Vérification pour le développement
+
+Node.js 24 et pnpm 11.25.0 sont utilisés. Pour les tests, utiliser exclusivement une base MySQL isolée et migrée, puis définir `TEST_MYSQL_URL`. La suite lance sa propre API de test sur un port temporaire. Elle crée et supprime uniquement ses données de test.
+
+```text
+pnpm install --frozen-lockfile
+pnpm --filter backend migrate
+pnpm build
+pnpm test
+```
+
+La compilation nécessite `VITE_API_URL`. La CI emploie une URL HTTPS fictive pour vérifier la compilation, sans effectuer de déploiement ni d’appel à cette URL. Les migrations nécessitent `MYSQL_MIGRATION_URL` ou `MYSQL_URL`.
+
+Voir [les vérifications exécutées](docs/verification.md). Les inventaires physiques avec sessions de comptage et le scan caméra ne sont pas implémentés dans cette version. Le coût affiché sert à une valorisation indicative, sans méthode comptable FIFO ou CUMP.

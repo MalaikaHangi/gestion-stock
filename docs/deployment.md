@@ -1,31 +1,87 @@
-# Déploiement prévu
+# Mise en ligne sur les projets existants
 
-Cette étape prépare les sources ; elle ne constitue pas un déploiement de production validé.
+## État des accès et destinations
 
-## Frontend / Vercel
+- Espace Vercel fourni : https://vercel.com/danielhangi77-2714
+- Projet Vercel identifié via les statuts GitHub : `gestion-stock`.
+- Un second projet `gestion-stock-1fo6` est également lié au dépôt ; son précédent statut est un échec. Ne pas créer de troisième projet. Ne pas supprimer le doublon avant confirmation de son usage.
+- Projet Render fourni : https://dashboard.render.com/project/prj-dbm7i1psrm7s73fag0hg
+- Le nom du service Render, son URL publique, sa connexion MySQL et ses variables restent à vérifier avec un accès authentifié.
 
-Importer le dépôt GitHub. Framework Vite, dossier racine `frontend`, commande de compilation `pnpm build`, sortie `dist`. Définir `VITE_API_URL=https://votre-api.onrender.com`. La valeur est publique et compilée dans le frontend ; reconstruire après modification.
+Les fichiers ci-dessous sont prêts pour le déploiement. Ils ne représentent pas une confirmation de configuration des comptes distants.
 
-## Backend / Render
+## Vercel
 
-Créer un Web Service Node depuis le dépôt, avec la racine du dépôt, commande build `pnpm install --frozen-lockfile && pnpm --filter backend build`, commande start `pnpm --filter backend start --hostname 0.0.0.0 --port $PORT`. Utiliser Node 24 et la version pnpm du package.json. Définir `MYSQL_URL`, `MYSQL_SSL_CA` si TLS avec autorité dédiée, `ALLOWED_ORIGINS=https://votre-frontend.vercel.app`. Health check : `/api/health`.
+Dans le projet `gestion-stock`, relier `MalaikaHangi/gestion-stock`, branche de production `main`.
 
-Les migrations doivent être lancées explicitement et une seule fois avant mise en service, dans un environnement ayant accès au même serveur MySQL. Ne pas les lancer à chaque démarrage d’instance.
+Configuration recommandée avec **Root Directory = racine du dépôt** : `vercel.json` configure Vite, l’installation pnpm, la compilation `frontend` et la sortie `frontend/dist`. Définir `VITE_API_URL=https://URL-PUBLIQUE-DE-L-API.onrender.com` dans les environnements souhaités. Aucune URL locale n’est acceptée pour une compilation de production.
 
-## MySQL persistant
+Si le projet existant utilise déjà `frontend` comme Root Directory, le fichier `frontend/vercel.json` conserve les réécritures SPA ; conserver la racine existante ou la déplacer explicitement après vérification. Ne pas combiner `Root Directory=frontend` avec `Output Directory=frontend/dist` : dans ce cas la sortie est `dist`.
 
-Render ne fournit pas automatiquement une base MySQL managée avec le backend. Choisir un fournisseur MySQL externe avec TLS, sauvegardes et accès réseau autorisé depuis Render, ou une instance MySQL sur un service privé Render avec disque persistant. Cette seconde option demande d’administrer soi-même MySQL et ses sauvegardes. Les services/disques choisis peuvent être payants ; confirmer l’offre dans le tableau de bord avant de les créer.
+Après liaison Git, Vercel lance un déploiement sur les nouveaux commits. Les origines de prévisualisation ne doivent pas être autorisées globalement dans CORS : ajouter seulement les origines effectivement utilisées.
 
-Créer un utilisateur de migration distinct du compte applicatif. Ce dernier doit avoir uniquement les privilèges nécessaires aux routes et à l’exécution des procédures, sans DDL ni accès aux autres bases. Les écritures de stock passent uniquement par la procédure ; éviter de fournir des privilèges directs sur `ledger` et `stock_balances`. Tester les droits et `SQL SECURITY DEFINER` avec l’administrateur MySQL.
+## API Render
 
-Sauvegarder avec un outil MySQL cohérent (par exemple `mysqldump --single-transaction --routines`) et conserver des copies chiffrées hors instance. Tester la restauration sur une base isolée. Les instantanés d’un disque ne remplacent pas une sauvegarde logique testée. En cas de migration DDL interrompue, inspecter les objets existants avant relance : MySQL ne garantit pas un rollback transactionnel de toute une migration DDL. Le runner mémorise seulement les migrations terminées. Privilégier les migrations additives et un retour de version applicative compatible.
+Rattacher le **service existant** au même dépôt et à `main`. Le nom `gestion-stock` de `render.yaml` doit correspondre au service réel avant toute synchronisation Blueprint ; sinon, le modifier pour éviter la création d’un doublon.
 
-## Documentation officielle consultée le 5 novembre 2026
+Paramètres à appliquer au service Node :
 
-- Next.js : https://nextjs.org/docs/app/getting-started/installation (Node minimum 20.9, projet basé sur Node 24).
-- Render / Next.js : https://render.com/docs/deploy-nextjs-app
-- Render / MySQL : https://render.com/docs/deploy-mysql
-- Render / disques : https://render.com/docs/disks
-- Vercel / Vite : https://vercel.com/docs/frameworks/frontend/vite
+```text
+Build Command:
+npx --yes pnpm@11.25.0 install --frozen-lockfile && npx --yes pnpm@11.25.0 --filter backend build
 
-À valider sur les comptes choisis : disponibilité régionale, offres, limites de connexion MySQL, domaines, TLS et sauvegardes. Aucun tarif supposé.
+Start Command:
+node backend/scripts/start-hosted.mjs
+
+Health Check Path:
+/api/health
+```
+
+Racine du service : dépôt complet, et non `backend` seul, car le runner lit `sql/` à la racine. Utiliser Node 24.22.1. Pour Auto-Deploy, sélectionner **After CI Checks Pass** ; le workflow GitHub de vérification est inclus. Le compte GitHub doit être connecté à Render : une URL de dépôt public saisie sans intégration Git ne suffit pas à activer les déploiements automatiques.
+
+Variables :
+
+| Variable | Valeur / usage |
+| --- | --- |
+| MYSQL_URL | Connexion de l’API à la base MySQL persistante |
+| MYSQL_MIGRATION_URL | Connexion disposant des droits de migration et de création des routines ; repli sur MYSQL_URL si absente |
+| MYSQL_SSL_CA | Autorité TLS si requise ; la validation du certificat reste activée |
+| ALLOWED_ORIGINS | URL HTTPS exacte du frontend Vercel, sans barre finale ; plusieurs origines séparées par virgules |
+| ADMIN_EMAIL / ADMIN_PASSWORD | Initialisation du premier administrateur, 12 caractères minimum pour le mot de passe |
+| MANAGER_EMAIL / MANAGER_PASSWORD | Initialisation facultative du premier responsable |
+| PORT | Fournie par Render, utilisée automatiquement |
+
+Les comptes existants ne sont jamais réinitialisés par un push. Après création initiale, retirer les variables de mots de passe de bootstrap si elles ne sont plus nécessaires. Ne pas exécuter le seed de démonstration sur la production.
+
+## Migrations automatiques de la base hébergée
+
+Le script de démarrage s’exécute en trois étapes : migrations, bootstrap idempotent, lancement Next.js. La migration acquiert un verrou MySQL nommé et enregistre les versions et étapes appliquées. Deux démarrages concurrents ne migrent donc pas simultanément la même base. Toute erreur interrompt le lancement.
+
+Sur une offre Render proposant les commandes **pre-deploy**, il est possible de déplacer `node backend/scripts/migrate.mjs && node backend/scripts/bootstrap.mjs` dans cette phase puis de lancer Next.js seul au démarrage. La version fournie fonctionne aussi avec la phase de démarrage, sans imposer l’achat d’une offre uniquement pour le pre-deploy. Elle nécessite l’accès à la base depuis le service.
+
+MySQL exécute des commits implicites pour beaucoup de DDL. Le suivi d’étapes facilite les reprises, mais ne transforme pas une migration DDL en transaction : inspecter toute migration interrompue, notamment si la coupure survient entre une instruction et l’enregistrement de son étape. Ne pas modifier une ancienne migration déjà appliquée ; en ajouter une nouvelle. Tester d’abord sur une base de test et sauvegarder avant les changements de schéma.
+
+## Base MySQL sur Render
+
+Vérifier d’abord si une instance MySQL persistante existe déjà dans le projet. Un projet Render ou un service Node ne crée pas automatiquement MySQL. Une base Render PostgreSQL n’est pas interchangeable avec MySQL.
+
+Pour héberger MySQL sur Render, l’option documentée est un service privé Docker MySQL avec disque persistant monté sur `/var/lib/mysql`, dans la même région et le même workspace que l’API. L’API utilise son nom réseau privé et le port 3306. Ne pas ouvrir MySQL publiquement. Les données doivent rester sur ce disque entre les déploiements.
+
+La création de nouveaux services et disques peut être payante ; aucune nouvelle infrastructure n’est créée automatiquement par les fichiers de ce dépôt. Vérifier l’instance et l’offre existantes avant toute création. Un fournisseur MySQL externe avec TLS reste possible si le projet dispose déjà d’une telle base.
+
+Séparer le compte de migration du compte applicatif. Pour `stock_level`, MySQL peut demander des privilèges supplémentaires quand le journal binaire est activé ; fournir le compte administratif approprié pour la migration, sans désactiver globalement la protection des créateurs de fonctions. Les routines sont les seuls chemins d’écriture du registre et des soldes. En production, retirer au compte API les droits DDL et les droits directs de modification de `ledger` et `stock_balances` ; conserver `EXECUTE` et les droits CRUD nécessaires sur les autres tables. Vérifier les privilèges et le DEFINER des routines sur l’instance choisie.
+
+Sauvegarder avec un outil MySQL, par exemple `mysqldump --single-transaction --routines`, dans un stockage indépendant et chiffré. Tester la restauration dans une base isolée. Les instantanés de disque ne remplacent pas une sauvegarde logique MySQL vérifiée.
+
+## Vérification finale attendue sur les services
+
+Confirmer : CI GitHub réussie ; Vercel et Render déployés sur le même commit ; API `/api/health` en succès ; connexion administrateur et responsable ; réception puis sortie avec quantité correcte ; refus d’une sortie excessive ; historique conservé après un nouveau push ; connexion effective à la base hébergée.
+
+## Références officielles
+
+- https://vercel.com/docs/git
+- https://vercel.com/docs/frameworks/frontend/vite
+- https://render.com/docs/deploys
+- https://render.com/docs/blueprint-spec
+- https://render.com/docs/deploy-mysql
+- https://render.com/docs/disks

@@ -1,0 +1,28 @@
+# Configuration de l’API. À rattacher au service existant après vérification de son nom.
+# La base MySQL persistante est indépendante de ce service ; aucune base n’est recréée au déploiement.
+services:
+  - type: web
+    name: gestion-stock
+    runtime: node
+    branch: main
+    autoDeployTrigger: checksPass
+    buildCommand: npx --yes pnpm@11.25.0 install --frozen-lockfile && npx --yes pnpm@11.25.0 --filter backend build
+    startCommand: node backend/scripts/start-hosted.mjs
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 24.22.1
+      - key: MYSQL_URL
+        sync: false
+      - key: MYSQL_MIGRATION_URL
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: MANAGER_EMAIL
+        sync: false
+      - key: MANAGER_PASSWORD
+        sync: false
